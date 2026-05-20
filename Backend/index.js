@@ -1,28 +1,15 @@
 import dotenv from "dotenv";
-import { connectDB } from "./db/index.js";
 import { createServer } from "http";
-import { Server } from "socket.io";
 import app from "./app.js";
+import { initializeSocket } from "./src/utils/socket.js";
+import { connectDB } from "./src/db/index.js";
+
 dotenv.config();
 
 const PORT = process.env.PORT || 8000;
-
 const httpServer = createServer(app);
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: ["http://localhost:5173", "http://localhost:3000"],
-    credentials: true,
-  }
-});
-
-io.on("connection", (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
-
-  socket.on("disconnect", () => {
-    console.log(`❌ Socket disconnected: ${socket.id}`);
-  });
-});
+initializeSocket(httpServer);
 
 connectDB()
   .then(() => {
