@@ -73,6 +73,19 @@ const joinRoomInternal = async (payload, user) => {
     return room;
 };
 
+const leaveRoomInternal = async (inviteCode, userId) => {
+    if (!inviteCode || !userId) return null;
 
-export { createRoomInternal ,joinRoomInternal };
+    const room = await Room.findOneAndUpdate(
+        { inviteCode: inviteCode.toUpperCase() },
+        { $pull: { participants: { userId } } },
+        { new: true }
+    );
+
+    if (!room) return null;
+
+    return room;
+};
+
+export { createRoomInternal ,joinRoomInternal ,leaveRoomInternal };
 
