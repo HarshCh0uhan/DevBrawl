@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkODhmZjk4Mzg1ZjZjZjY1Zjk5MWQiLCJlbWFpbCI6ImFpc2hAZ21haWwuY29tIiwidXNlcm5hbWUiOiJhaXNoIiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzkzMzk1MDAsImV4cCI6MTc3OTQyNTkwMH0.4-L2AyfEHd7Kh1ZIUBwKUopq-2s8JMztpmruvTx8pLg";
+
+    const socket = io("http://localhost:8000", {
+      auth: { token }
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ aish connected:", socket.id);
+
+      socket.emit("join-room", {
+        inviteCode: "HO3GIH"
+      }, (res) => {
+        console.log("🚪 join-room response:", res);
+      });
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ error:", err.message);
+    });
+
+    function disconnect() {
+      socket.disconnect();
+      console.log("🔌 aish disconnected manually");
+    }
+  </script>
+
+  <button onclick="disconnect()">Leave Room</button>
+</body>
+</html>
