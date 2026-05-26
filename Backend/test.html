@@ -6,7 +6,7 @@
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script>
-  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkN2U0NGE5MDlmOGVjM2UwMTA4OWQiLCJlbWFpbCI6Imxlb0BnbWFpbC5jb20iLCJ1c2VybmFtZSI6Imxlb24iLCJyb2xlIjoiU1RVREVOVCIsImlhdCI6MTc3OTMzOTUzNywiZXhwIjoxNzc5NDI1OTM3fQ.vlDgG51qRYLaHtRq3ZQxJV8q2wD6Ff63xVmFh7oOyug";
+  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkN2U0NGE5MDlmOGVjM2UwMTA4OWQiLCJlbWFpbCI6Imxlb0BnbWFpbC5jb20iLCJ1c2VybmFtZSI6Imxlb24iLCJyb2xlIjoiU1RVREVOVCIsImlhdCI6MTc3OTc3Mzg0MCwiZXhwIjoxNzc5ODYwMjQwfQ.piN5_Bf4j811fiBJEHblwvmd3MHw67GNjHP6yylA67Q";
   const socket = io("http://localhost:8000", { auth: { token } });
 
   socket.on("connect", () => {

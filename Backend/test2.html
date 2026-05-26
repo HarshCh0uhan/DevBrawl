@@ -3,7 +3,7 @@
 <body>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkODhmZjk4Mzg1ZjZjZjY1Zjk5MWQiLCJlbWFpbCI6ImFpc2hAZ21haWwuY29tIiwidXNlcm5hbWUiOiJhaXNoIiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3NzkzMzk1MDAsImV4cCI6MTc3OTQyNTkwMH0.4-L2AyfEHd7Kh1ZIUBwKUopq-2s8JMztpmruvTx8pLg";
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkODhmZjk4Mzg1ZjZjZjY1Zjk5MWQiLCJlbWFpbCI6ImFpc2hAZ21haWwuY29tIiwidXNlcm5hbWUiOiJhaXNoIiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3Nzk3NzM4ODcsImV4cCI6MTc3OTg2MDI4N30.P3cz_RHmq2lE9MSudj7F4IQliFdwSeX8M0y-JDSV1HM";
 
     const socket = io("http://localhost:8000", {
       auth: { token }
@@ -13,7 +13,7 @@
       console.log("✅ aish connected:", socket.id);
 
       socket.emit("join-room", {
-        inviteCode: "HO3GIH"
+        inviteCode: "JFFBHK"
       }, (res) => {
         console.log("🚪 join-room response:", res);
       });
