@@ -97,6 +97,9 @@ socket.on("disconnect", async () => {
                 socket.emit("send-message" ,{success:false ,error:error.message})
             }
         })
+        socket.on("canvas-change", (data) => {
+        socket.to(data.roomId).emit("receive-canvas-change", data);
+       });
     });
 
     return io;

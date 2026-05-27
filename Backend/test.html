@@ -1,0 +1,62 @@
+
+
+<!DOCTYPE html>
+<html>
+<body>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script>
+  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTBkN2U0NGE5MDlmOGVjM2UwMTA4OWQiLCJlbWFpbCI6Imxlb0BnbWFpbC5jb20iLCJ1c2VybmFtZSI6Imxlb24iLCJyb2xlIjoiU1RVREVOVCIsImlhdCI6MTc3OTc3Mzg0MCwiZXhwIjoxNzc5ODYwMjQwfQ.piN5_Bf4j811fiBJEHblwvmd3MHw67GNjHP6yylA67Q";
+  const socket = io("http://localhost:8000", { auth: { token } });
+
+  socket.on("connect", () => {
+    console.log("✅ leon connected:", socket.id);
+    
+    // 1. Check if Leon already has an active room stored in memory
+    const savedCode = localStorage.getItem("activeInviteCode");
+    if (savedCode) {
+        console.log(`♻️ Found active room in storage. Rejoining: ${savedCode}`);
+        // Tell the server Leon is re-entering his existing room channel
+        socket.emit("join-room", { inviteCode: savedCode }, (res) => {
+            console.log("🏠 Successfully rejoined existing room:", res);
+        });
+    }
+  });
+
+  socket.on("user-joined", (data) => {
+    console.log("👤 user-joined:", data);
+  });
+  socket.on("user-left", (data) => {
+    console.log("👋 user-left:", data);
+});
+
+  function createRoom() {
+    socket.emit("create-room", {
+      name: "Leon's Room",
+      language: "javascript",
+      maxParticipants: 4
+    }, (res) => {
+      if (res.success && res.data) {
+        console.log("🏠 room created:", res);
+        
+        // 2. Persist the invite code so reloads don't destroy it
+        const code = res.data.inviteCode;
+        localStorage.setItem("activeInviteCode", code);
+        console.log(`💾 Invite Code saved to LocalStorage: ${code}`);
+      }
+    });
+  }
+
+  // Clear room function for testing convenience
+  function leaveCurrentRoom() {
+      localStorage.removeItem("activeInviteCode");
+      console.log("🧹 Local storage cleared. Next click will make a new room.");
+      window.location.reload();
+  }
+</script>
+
+<button onclick="createRoom()">Create Room</button>
+<button onclick="leaveCurrentRoom()">Reset/Clear Room</button>
+
+</body>
+</html>
