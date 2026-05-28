@@ -5,18 +5,18 @@ import { ApiError } from "../utils/apiError.js";
 const createRoomInternal = async (payload, user) => {
     const { name, language, maxParticipants } = payload;
 
-    if (!name || !language) {
-        throw new ApiError(400, "Room name and language are required");
-    }
+    // if (!name || !language) {
+    //     throw new ApiError(400, "Room name and language are required");
+    // }
 
     if (!user?._id) {
         throw new ApiError(401, "Authentication failed. User context missing.");
     }
 
     const room = await Room.create({
-        name,
+        name: name || `Room-${Date.now()}`,
         hostId: user._id,
-        language: language.toLowerCase(),
+        language: language || "javascript",
         maxParticipants: maxParticipants || 8,
         code: "",
         participants: [
