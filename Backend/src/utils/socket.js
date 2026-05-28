@@ -101,7 +101,7 @@ export const initializeSocket = (httpServer) => {
             try {
                 const {roomId , message} = payload;
 
-                socket.to(roomId).emit("recieve-message",{
+                socket.to(roomId).emit("receive-message",{
                     userId:socket.user._id,
                     username:socket.user.username,
                     message:message,
