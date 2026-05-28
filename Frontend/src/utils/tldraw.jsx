@@ -29,14 +29,14 @@ const cleanupListener = editor.store.listen((update) => {
     Object.keys(payload.updated).length > 0 ||
     Object.keys(payload.removed).length > 0
   ) {
-    console.log("📤 emitting canvas-change:", payload) // ← add
+    // console.log("📤 emitting canvas-change:", payload)
     socket.emit("canvas-change", payload)
   }
 }, { source: 'user', scope: 'document' })
 
 
     socket.on("receive-canvas-change", (data) => {
-    console.log("📥 received canvas-change:", data)
+    // console.log("📥 received canvas-change:", data)
       isRemoteChange.current = true
 
       editor.store.mergeRemoteChanges(() => {
@@ -72,9 +72,11 @@ const cleanupListener = editor.store.listen((update) => {
   return null
 }
 
-export default function CollaborativeCanvas({ roomId, currentUser }) {
+//  currentUser removed from arguments no use right now thats why
+
+export default function CollaborativeCanvas({ roomId}) {
   return (
-    <div style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh' }}>
+    <div className="w-full h-full min-h-0 relative">
       <Tldraw>
         <SyncedCanvas roomId={roomId} />
       </Tldraw>
