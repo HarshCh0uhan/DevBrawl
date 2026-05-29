@@ -52,7 +52,8 @@ export const initializeSocket = (httpServer) => {
                 socket.to(updatedRoom.inviteCode).emit("user-joined", {
                     userId: socket.user._id,
                     username: socket.user.username,
-                    systemMessage: `${socket.user.username} has joined the workspace.`
+                    systemMessage: `${socket.user.username} has joined the workspace.`,
+                    participants: updatedRoom.participants
                 });
 
                 if (typeof callback === "function") {
@@ -64,30 +65,43 @@ export const initializeSocket = (httpServer) => {
                 }
             }
         });
-socket.on("disconnect", async () => {
-    console.log(`❌ Socket disconnected: ${socket.id}`);
-    console.log(`📍 currentRoom: ${socket.currentRoom}`); // ← add this
-    
-    if (!socket.currentRoom) return;
-    
-    const room = await leaveRoomInternal(socket.currentRoom, socket.user._id);
-    console.log(`🏠 room after leave:`, room); // ← add this
+        socket.on("start-room-session", (payload) => {
+            const { inviteCode } = payload;
+            
+            if (!inviteCode) return;
 
-    if (!room) return;
+            // Broadcast down the entire room channel channel telling everyone to change pages
+            io.to(inviteCode.toUpperCase()).emit("room-started", {
+                inviteCode: inviteCode.toUpperCase()
+            });
+            
+            console.log(`🚀 Workspace session explicitly launched by host for room node: ${inviteCode}`);
+        });
 
-    console.log(`📢 emitting user-left to room: ${socket.currentRoom}`); // ← add this
-    io.to(socket.currentRoom).emit("user-left", {
-        userId: socket.user._id,
-        username: socket.user.username,
-        systemMessage: `${socket.user.username} has left the workspace.`
-    });
-});
+        socket.on("disconnect", async () => {
+            console.log(`❌ Socket disconnected: ${socket.id}`);
+            console.log(`📍 currentRoom: ${socket.currentRoom}`); // ← add this
+            
+            if (!socket.currentRoom) return;
+            
+            const room = await leaveRoomInternal(socket.currentRoom, socket.user._id);
+            console.log(`🏠 room after leave:`, room); // ← add this
+
+            if (!room) return;
+
+            console.log(`📢 emitting user-left to room: ${socket.currentRoom}`); // ← add this
+            io.to(socket.currentRoom).emit("user-left", {
+                userId: socket.user._id,
+                username: socket.user.username,
+                systemMessage: `${socket.user.username} has left the workspace.`
+            });
+        });
 
         socket.on("send-message" ,async (payload)=>{
             try {
                 const {roomId , message} = payload;
 
-                socket.to(roomId).emit("recieve-message",{
+                socket.to(roomId).emit("receive-message",{
                     userId:socket.user._id,
                     username:socket.user.username,
                     message:message,
@@ -100,6 +114,9 @@ socket.on("disconnect", async () => {
         socket.on("canvas-change", (data) => {
         socket.to(data.roomId).emit("receive-canvas-change", data);
        });
+       socket.on("code-change", (data) => {
+       socket.to(data.roomId).emit("receive-code-change", data)
+    })
     });
 
     return io;
