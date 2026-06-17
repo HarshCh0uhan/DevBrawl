@@ -63,7 +63,7 @@ export default function Dashboard() {
     setCreateError('');
     setIsCreating(true);
 
-    socket.emit("create-room", { name: `${user?.username}'s Session`, language: 'javascript' }, (res) => {
+    socket.emit("create-room", { name: `${user?.username}'s Session`}, (res) => {
       setIsCreating(false);
       if (res?.success) {
         setRoom(res.data);
