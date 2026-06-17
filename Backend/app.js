@@ -18,7 +18,9 @@ app.get('/', (req, res) => {
 })
 
 import userRouter from './src/routes/user.routes.js'
+import compilerRouter from './src/routes/compiler.routes.js'
 
 app.use("/api/v1/users", userRouter)
+app.use("/api/v1/compiler", compilerRouter);
 
 export default app

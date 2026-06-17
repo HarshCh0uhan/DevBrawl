@@ -3,7 +3,7 @@ import { ApiError } from "../utils/apiError.js";
 import { AccessToken } from 'livekit-server-sdk'
 
 const createRoomInternal = async (payload, user) => {
-    const { name, language, maxParticipants } = payload || {};
+    const { name, maxParticipants } = payload || {};
 
     if (!user?._id) {
         throw new ApiError(401, "Authentication failed. User context missing.");
@@ -12,7 +12,7 @@ const createRoomInternal = async (payload, user) => {
     const room = await Room.create({
         name: name || `Room-${user.username}`,
         hostId: user._id,
-        language: language || "javascript",
+        // language: language || "javascript",
         maxParticipants: maxParticipants || 8,
         code: "",
         participants: [{ userId: user._id, username: user.username }],
