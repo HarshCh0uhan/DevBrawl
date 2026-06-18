@@ -13,14 +13,19 @@ app.use(cors({
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
+
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' })
 })
 
 import userRouter from './src/routes/user.routes.js'
 import compilerRouter from './src/routes/compiler.routes.js'
+import submissionRouter from './src/routes/submission.routes.js'
+import questionRouter from './src/routes/question.routes.js'
 
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/compiler", compilerRouter);
+app.use("/api/v1/submissions", submissionRouter)
+app.use("/api/v1/questions", questionRouter)
 
 export default app

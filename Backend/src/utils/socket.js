@@ -1,7 +1,50 @@
+
 import { Server } from "socket.io";
 import { socketAuthMiddleware } from "../middlewears/auth.socket.middlewear.js";
-import { createRoomInternal , joinRoomInternal ,leaveRoomInternal } from "../controllers/room.controller.js";
+import { createRoomInternal, joinRoomInternal, leaveRoomInternal } from "../controllers/room.controller.js";
 import { Room } from "../model/room.model.js";
+import { generateQuestion } from "../services/aiQuestionGenerator.js";
+import { Question } from "../model/question.model.js";
+import { setIoInstance } from "../services/aiScoringQueue.js";
+
+// ─── Helper: strip hidden test cases before sending to clients ─────────────
+const sanitizeQuestion = (question) => ({
+  _id: question._id,
+  roomId: question.roomId,
+  roundNumber: question.roundNumber,
+  topic: question.topic,
+  difficulty: question.difficulty,
+  title: question.title,
+  prompt: question.prompt,
+  constraints: question.constraints,
+  timeLimitMs: question.timeLimitMs,
+  sampleTestCases: question.testCases
+    .filter((tc) => !tc.isHidden)
+    .map((tc) => ({ input: tc.input, expectedOutput: tc.expectedOutput })),
+});
+
+// ─── Shared question generation logic (used by both start-round and regen) ─
+const generateAndBroadcastQuestion = async (io, roomId, roundNumber, topic, difficulty) => {
+  try {
+    const generated = await generateQuestion(topic, difficulty || "medium");
+
+    // Replace any existing question for this room/round (handles regeneration)
+    await Question.deleteOne({ roomId, roundNumber });
+    const question = await Question.create({ roomId, roundNumber, ...generated });
+
+    io.to(roomId).emit("round-question-ready", sanitizeQuestion(question));
+
+    console.log(`✅ Question generated for room ${roomId} round ${roundNumber}: "${question.title}"`);
+  } catch (err) {
+    console.error(`❌ Question generation failed for room ${roomId}:`, err.message);
+
+    io.to(roomId).emit("round-question-failed", {
+      roomId,
+      roundNumber,
+      error: "Failed to generate question. Host can try regenerating.",
+    });
+  }
+};
 
 export const initializeSocket = (httpServer) => {
     const io = new Server(httpServer, {
@@ -13,11 +56,16 @@ export const initializeSocket = (httpServer) => {
 
     io.use(socketAuthMiddleware);
 
+    // ─── Give the Phase 2 scoring queue a reference to broadcast through ────
+    // This lets queuePhase2Scoring() emit events to rooms without needing
+    // socket.js to import the queue's broadcasting logic directly, avoiding
+    // a circular import (queue \u2192 controller \u2192 socket.js \u2192 queue).
+    setIoInstance(io);
+
     io.on("connection", (socket) => {
         console.log(`🔌 Authenticated Socket connected: ${socket.id} | User: ${socket.user.username}`);
 
         socket.on("create-room", async (payload, callback) => {
-    // Parse payload if it came as a string
     const data = typeof payload === "string" ? JSON.parse(payload) : payload;
     
     try {
@@ -28,7 +76,6 @@ export const initializeSocket = (httpServer) => {
         if (typeof callback === "function") {
             callback({ success: true, data: newRoom });
         } else {
-            // No callback (Postman issue) — emit directly back to sender
             socket.emit("room-created", { success: true, data: newRoom });
         }
     } catch (error) {
@@ -65,12 +112,12 @@ export const initializeSocket = (httpServer) => {
                 }
             }
         });
+
         socket.on("start-room-session", (payload) => {
             const { inviteCode } = payload;
             
             if (!inviteCode) return;
 
-            // Broadcast down the entire room channel channel telling everyone to change pages
             io.to(inviteCode.toUpperCase()).emit("room-started", {
                 inviteCode: inviteCode.toUpperCase()
             });
@@ -78,18 +125,65 @@ export const initializeSocket = (httpServer) => {
             console.log(`🚀 Workspace session explicitly launched by host for room node: ${inviteCode}`);
         });
 
+        // ─── NEW: Host picks a topic, triggers AI question generation ──────────
+        socket.on("start-round", async (payload) => {
+            const { inviteCode, roundNumber, topic, difficulty } = payload;
+
+            if (!inviteCode || !roundNumber || !topic) {
+                socket.emit("round-question-failed", {
+                    error: "inviteCode, roundNumber and topic are required",
+                });
+                return;
+            }
+
+            const roomId = inviteCode.toUpperCase();
+
+            // Let everyone in the room see the loading state immediately
+            io.to(roomId).emit("round-question-generating", {
+                roomId,
+                roundNumber,
+                topic,
+                difficulty: difficulty || "medium",
+            });
+
+            await generateAndBroadcastQuestion(io, roomId, roundNumber, topic, difficulty);
+        });
+
+        // ─── NEW: Host regenerates question if unhappy with current one ────────
+        socket.on("regenerate-round-question", async (payload) => {
+            const { inviteCode, roundNumber, topic, difficulty } = payload;
+
+            if (!inviteCode || !roundNumber || !topic) {
+                socket.emit("round-question-failed", {
+                    error: "inviteCode, roundNumber and topic are required",
+                });
+                return;
+            }
+
+            const roomId = inviteCode.toUpperCase();
+
+            io.to(roomId).emit("round-question-regenerating", {
+                roomId,
+                roundNumber,
+                topic,
+                difficulty: difficulty || "medium",
+            });
+
+            await generateAndBroadcastQuestion(io, roomId, roundNumber, topic, difficulty);
+        });
+
         socket.on("disconnect", async () => {
             console.log(`❌ Socket disconnected: ${socket.id}`);
-            console.log(`📍 currentRoom: ${socket.currentRoom}`); // ← add this
+            console.log(`📍 currentRoom: ${socket.currentRoom}`);
             
             if (!socket.currentRoom) return;
             
             const room = await leaveRoomInternal(socket.currentRoom, socket.user._id);
-            console.log(`🏠 room after leave:`, room); // ← add this
+            console.log(`🏠 room after leave:`, room);
 
             if (!room) return;
 
-            console.log(`📢 emitting user-left to room: ${socket.currentRoom}`); // ← add this
+            console.log(`📢 emitting user-left to room: ${socket.currentRoom}`);
             io.to(socket.currentRoom).emit("user-left", {
                 userId: socket.user._id,
                 username: socket.user.username,
