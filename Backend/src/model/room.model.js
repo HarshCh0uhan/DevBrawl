@@ -9,14 +9,18 @@ const participantSchema = new mongoose.Schema({
 
 const roomSchema = new mongoose.Schema({
   name:            { type: String, required: true, trim: true },
-//   inviteCode:      { type: String, unique: true, default: () => nanoid(6).toUpperCase() },
-  inviteCode: { type: String, unique: true, index: true, default: () => nanoid(6).toUpperCase() },
+  inviteCode:      { type: String, unique: true, index: true, default: () => nanoid(6).toUpperCase() },
   hostId:          { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   participants:    [participantSchema],
   code:            { type: String, default: "" },
-  // language:        { type: String, default: "javascript" },
   isActive:        { type: Boolean, default: true },
   maxParticipants: { type: Number, default: 8 },
+
+  // ── Game state ──────────────────────────────────────────────
+  gameStatus:        { type: String, enum: ["waiting", "turn_active", "all_done"], default: "waiting" },
+  currentTurnIndex:  { type: Number, default: 0 },
+  activePlayerId:    { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
 }, { timestamps: true });
 
 export const Room = mongoose.model("Room", roomSchema);

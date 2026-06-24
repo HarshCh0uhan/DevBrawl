@@ -1,104 +1,10 @@
-// import { GoogleGenAI } from '@google/genai';
 
-// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-// // Using the standard Gemini flash model signature
-// const MODEL = "gemini-2.5-flash"; 
-
-// const SYSTEM_PROMPT = `You are a technical interview question generator for a competitive coding platform called DevBrawl.
-
-// Your job: generate ONE coding question for a given topic and difficulty, along with test cases that can be used to automatically judge a candidate's solution.
-
-// CRITICAL RULES:
-// 1. Respond with ONLY valid JSON. No markdown, no backticks, no preamble.
-// 2. The question must be solvable by reading stdin and writing to stdout (no special I/O frameworks).
-// 3. Generate exactly 5 test cases: 2 marked "isHidden": false (samples shown to the player) and 3 marked "isHidden": true (used only for judging).
-// 4. Test case inputs and outputs must be EXACT strings as they would appear via stdin/stdout — no extra formatting, no trailing periods, consistent whitespace.
-// 5. Keep the question solvable within 10 seconds of execution time for reasonable solutions.
-// 6. Make the 3 hidden test cases meaningfully different from the 2 samples (cover edge cases: empty input, large input, boundary values).
-// 7. The "prompt" field should read like a real interview question: clear problem statement, input format, output format, and 1-2 examples embedded in the text.`;
-
-// // Define a strict JSON schema configuration for the SDK to guarantee exact response shapes
-// const jsonResponseSchema = {
-//   type: "OBJECT",
-//   properties: {
-//     title: { type: "STRING" },
-//     prompt: { type: "STRING" },
-//     constraints: { type: "STRING" },
-//     testCases: {
-//       type: "ARRAY",
-//       items: {
-//         type: "OBJECT",
-//         properties: {
-//           input: { type: "STRING" },
-//           expectedOutput: { type: "STRING" },
-//           isHidden: { type: "BOOLEAN" },
-//           weight: { type: "INTEGER" }
-//         },
-//         required: ["input", "expectedOutput", "isHidden", "weight"]
-//       }
-//     }
-//   },
-//   required: ["title", "prompt", "constraints", "testCases"]
-// };
-
-// /**
-//  * Generates a coding question + test cases for a given topic/difficulty.
-//  * Returns parsed JSON matching the Question model shape.
-//  */
-// export const generateQuestion = async (topic, difficulty = "medium") => {
-//   const userPrompt = `Generate one ${difficulty} difficulty coding question on the topic: "${topic}".`;
-
-//   try {
-//     // Correct structure for the modern @google/genai SDK
-//     const response = await ai.models.generateContent({
-//       model: MODEL,
-//       contents: userPrompt,
-//       config: {
-//         systemInstruction: SYSTEM_PROMPT,
-//         // Forces Gemini to output pure JSON text matching the schema
-//         responseMimeType: "application/json",
-//         responseSchema: jsonResponseSchema,
-//         maxOutputTokens: 2000,
-//       }
-//     });
-
-//     // Extract the raw text directly from the SDK response object
-//     const rawText = response.text;
-
-//     // Direct parse — no regex string stripping needed anymore!
-//     const parsed = JSON.parse(rawText);
-
-//     // Ensure every test case fields are strictly formatted
-//     parsed.testCases = parsed.testCases.map((tc) => ({
-//       input: String(tc.input ?? ""),
-//       expectedOutput: String(tc.expectedOutput ?? ""),
-//       isHidden: Boolean(tc.isHidden ?? true),
-//       weight: Number(tc.weight ?? 1),
-//     }));
-
-//     return {
-//       title: parsed.title,
-//       prompt: parsed.prompt,
-//       constraints: parsed.constraints || "",
-//       testCases: parsed.testCases,
-//       topic,
-//       difficulty,
-//       generatedBy: "gemini",
-//     };
-
-//   } catch (err) {
-//     throw new Error(`Failed to generate or parse question via Gemini: ${err.message}`);
-//   }
-// };
 
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const MODEL = "gemini-2.5-flash"; 
 
-// 🚀 THE STRUCTURAL FIX: We convert prompt & constraints from flat strings 
-// to text arrays. This stops Flash from leaking raw newlines into JSON properties!
 const questionResponseSchema = {
   type: "OBJECT",
   properties: {
@@ -153,8 +59,7 @@ Do not include any backticks or markdown fences (\`\`\`json) outside the structu
 
     const parsedData = JSON.parse(response.text);
 
-    // 🚀 RESTITCHING OBJECT: Re-assemble the lines into standard strings 
-    // so you don't have to change your frontend component layouts or database schemas!
+
     return {
       title: parsedData.title,
       prompt: parsedData.promptLines.join("\n"),
