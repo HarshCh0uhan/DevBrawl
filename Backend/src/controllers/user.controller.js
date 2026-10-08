@@ -9,16 +9,34 @@ import { ApiResponse } from "../utils/apiResponse.js";
 
 const generateAccessAndRefereshTokens = async (userId) => {
     try {
+        console.log("🔑 [token gen] start for userId:", userId);
+
         const user = await User.findById(userId);
+        console.log("🔑 [token gen] user found:", !!user);
+        if (!user) throw new Error(`User ${userId} not found`);
+
+        console.log("🔑 [token gen] ACCESS_TOKEN_SECRET set:", !!process.env.ACCESS_TOKEN_SECRET);
+        console.log("🔑 [token gen] REFRESH_TOKEN_SECRET set:", !!process.env.REFRESH_TOKEN_SECRET);
+        console.log("🔑 [token gen] ACCESS_TOKEN_EXPIRY:", process.env.ACCESS_TOKEN_EXPIRY);
+        console.log("🔑 [token gen] REFRESH_TOKEN_EXPIRY:", process.env.REFRESH_TOKEN_EXPIRY);
+
         const accessToken = user.generateAccessToken();
+        console.log("🔑 [token gen] access token signed");
+
         const refreshToken = user.generateRefreshToken();
+        console.log("🔑 [token gen] refresh token signed");
 
         user.refreshToken = refreshToken;
         await user.save({ validateBeforeSave: false });
+        console.log("🔑 [token gen] user saved");
 
         return { accessToken, refreshToken };
     } catch (error) {
-        throw new ApiError(500, "Something went wrong while generating tokens");
+        console.error("🚨 [token gen] FAILED");
+        console.error("   name:", error.name);
+        console.error("   message:", error.message);
+        console.error("   stack:", error.stack);
+        throw new ApiError(500, `Token generation failed: ${error.message}`);
     }
 };
 
@@ -55,7 +73,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res ,next) => {
 
-    const { fullName, email, username, password, role, phoneNumber} = req.body;
+    const { fullName, email, username, password, role, phoneNumber, avatarSelection } = req.body;
 
     if ([fullName, email, username, password, phoneNumber].some((field) => field?.trim() === "")) {
         throw new ApiError(400, "All common fields are required");
@@ -69,19 +87,25 @@ const registerUser = asyncHandler(async (req, res ,next) => {
         throw new ApiError(409, "User with email or username already exists");
     }
 
-    const avatarLocalPath = req.file?.path;
-    if (!avatarLocalPath) {
-        throw new ApiError(400, "Avatar file is required");
-    }
+    let avatarUrl = "";
 
-    const avatar = await uploadOnCloudinary(avatarLocalPath);
-    if (!avatar) {
-        throw new ApiError(400, "Avatar file upload failed");
+    // Handle avatar: uploaded file > default selection > empty
+    const avatarLocalPath = req.file?.path;
+    if (avatarLocalPath) {
+        const avatar = await uploadOnCloudinary(avatarLocalPath);
+        if (!avatar) {
+            throw new ApiError(400, "Avatar file upload failed");
+        }
+        avatarUrl = avatar.url;
+    } else if (avatarSelection) {
+        // User selected a default avatar (emoji/svg)
+        avatarUrl = avatarSelection;
     }
+    // If neither provided, avatarUrl stays empty (default from schema)
 
     const user = await User.create({
         fullName,
-        avatar: avatar.url,
+        avatar: avatarUrl,
         email,
         password,
         username: username.toLowerCase(),
