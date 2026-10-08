@@ -1,10 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
-import { generateStructuredJSON as groqGenerate, isGroqAvailable, GROQ_MODELS } from '../utils/groq.js';
+import { generateStructuredJSON as groqGenerate, isGroqAvailable } from '../utils/groq.js';
 import { generateStructuredJSON as openrouterGenerate, isOpenRouterAvailable } from '../utils/openrouter.js';
 
-const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-const GEMINI_MODEL = "gemini-2.5-flash";
 const AI_PROVIDER = process.env.AI_PROVIDER || 'auto';
 
 const SYSTEM_PROMPT = `You are an experienced technical interviewer reviewing a candidate's code submission in a live coding interview platform called DevBrawl.
@@ -26,7 +22,6 @@ CRITICAL RULES:
 5. "feedback" should be 2-4 sentences, constructive and specific, written as if speaking directly to the candidate.
 6. "summary" must be ONE short sentence (under 15 words) suitable for a scoreboard card.`;
 
-// Define a strict JSON schema configuration to guarantee exact response shapes
 const aiScoringSchema = {
   type: "OBJECT",
   properties: {
@@ -69,24 +64,6 @@ const normalizeResult = (parsed) => ({
   summary: String(parsed.summary || ""),
 });
 
-// --- Gemini Implementation ---
-const scoreWithGemini = async (userPrompt) => {
-  const response = await gemini.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: userPrompt,
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-      responseSchema: aiScoringSchema,
-      maxOutputTokens: 1000,
-    }
-  });
-
-  const rawText = response.text;
-  const parsed = JSON.parse(rawText);
-  return normalizeResult(parsed);
-};
-
 // --- Groq Implementation ---
 const scoreWithGroq = async (userPrompt) => {
   const parsed = await groqGenerate({
@@ -98,7 +75,7 @@ const scoreWithGroq = async (userPrompt) => {
   return normalizeResult(parsed);
 };
 
-// --- OpenRouter (Nemotron) Implementation ---
+// --- OpenRouter (NVIDIA Nemotron) Implementation ---
 const scoreWithOpenRouter = async (userPrompt) => {
   const parsed = await openrouterGenerate({
     systemPrompt: SYSTEM_PROMPT,
@@ -127,12 +104,8 @@ export const scoreSubmission = async ({
     testResults,
   });
 
-  // Build provider chain based on AI_PROVIDER setting
   let providers;
   switch (AI_PROVIDER) {
-    case 'gemini':
-      providers = ['gemini'];
-      break;
     case 'groq':
       providers = ['groq'];
       break;
@@ -141,24 +114,20 @@ export const scoreSubmission = async ({
       break;
     case 'auto':
     default:
-      providers = ['gemini', 'groq', 'openrouter'];
+      providers = ['groq', 'openrouter'];
   }
 
   let lastError;
 
   for (const provider of providers) {
     try {
-      if (provider === 'gemini') {
-        if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
-        console.log('🤖 Scoring with Gemini...');
-        return await scoreWithGemini(userPrompt);
-      } else if (provider === 'groq') {
+      if (provider === 'groq') {
         if (!isGroqAvailable()) throw new Error('GROQ_API_KEY not configured');
         console.log('🚀 Scoring with Groq...');
         return await scoreWithGroq(userPrompt);
       } else if (provider === 'openrouter') {
         if (!isOpenRouterAvailable()) throw new Error('OPENROUTER_API_KEY not configured');
-        console.log('🔮 Scoring with OpenRouter (Nemotron 3 Ultra)...');
+        console.log('🔮 Scoring with OpenRouter (Nemotron)...');
         return await scoreWithOpenRouter(userPrompt);
       }
     } catch (err) {
