@@ -400,6 +400,54 @@ MIT License — free for personal and commercial use.
 
 ---
 
+## 🛠️ Development Workflow (MANDATORY)
+
+**All contributors must follow this workflow for every task:**
+
+### 🔄 Git Workflow
+```bash
+# 1. Create feature branch from main
+git checkout main && git pull origin main
+git checkout -b feature/descriptive-name
+
+# 2. Implement changes
+# ... code changes ...
+
+# 3. Update documentation (README.md, AGENTS.md if workflow changes)
+
+# 4. Test locally
+# ... run tests, verify manually ...
+
+# 5. Commit & push
+git add .
+git commit -m "feat: descriptive message"
+git push origin feature/descriptive-name
+
+# 6. Create PR via GitHub CLI
+gh pr create --title "feat: descriptive title" --body "## Changes\n- ..."
+
+# 7. Merge after review
+gh pr merge --merge --delete-branch
+
+# 8. Clean up local
+git checkout main && git pull && git branch -d feature/descriptive-name
+```
+
+### 🧠 Agent Rules (MANDATORY for AI Assistants)
+
+**Before ANY code change, the agent MUST:**
+
+| Step | Rule | Why |
+|------|------|-----|
+| 1 | **Read actual current code first** | Don't assume - verify what exists |
+| 2 | **Check if fix already exists** | Don't add code that's already there |
+| 3 | **Verify with simple test** | Prove it works before claiming fixed |
+| 4 | **Restart server after changes** | Code changes need fresh process |
+
+**Violation = wasted time and hallucinated fixes.**
+
+---
+
 ## 🙏 Acknowledgments
 
 - **Piston** — Open source code execution engine
