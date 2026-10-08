@@ -1,9 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
+import { generateStructuredJSON, isGroqAvailable, GROQ_MODELS } from '../utils/groq.js';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Using the standard Gemini flash model signature
-const MODEL = "gemini-2.5-flash"; 
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GROQ_MODEL = GROQ_MODELS.SCORING;
+
+// Which AI provider to use: 'gemini' | 'groq' | 'auto' (auto tries gemini first, falls back to groq)
+const AI_PROVIDER = process.env.AI_PROVIDER || 'auto';
 
 const SYSTEM_PROMPT = `You are an experienced technical interviewer reviewing a candidate's code submission in a live coding interview platform called DevBrawl.
 
@@ -58,6 +63,46 @@ ${testSummary}
 Evaluate this submission's code quality and problem-solving approach.`;
 };
 
+const clamp = (n) => Math.max(0, Math.min(100, Math.round(Number(n || 0))));
+
+const normalizeResult = (parsed) => ({
+  codeQualityScore: clamp(parsed.codeQualityScore),
+  approachScore: clamp(parsed.approachScore),
+  feedback: String(parsed.feedback || ""),
+  summary: String(parsed.summary || ""),
+});
+
+// --- Gemini Implementation ---
+const scoreWithGemini = async (userPrompt) => {
+  const response = await gemini.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: userPrompt,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      responseMimeType: "application/json",
+      responseSchema: aiScoringSchema,
+      maxOutputTokens: 1000,
+    }
+  });
+
+  const rawText = response.text;
+  const parsed = JSON.parse(rawText);
+  return normalizeResult(parsed);
+};
+
+// --- Groq Implementation ---
+const scoreWithGroq = async (userPrompt) => {
+  const parsed = await generateStructuredJSON({
+    systemPrompt: SYSTEM_PROMPT,
+    userPrompt,
+    schema: aiScoringSchema,
+    model: GROQ_MODEL,
+    temperature: 0.1,
+  });
+  return normalizeResult(parsed);
+};
+
+// --- Main Export with Fallback Logic ---
 export const scoreSubmission = async ({
   questionPrompt,
   sourceCode,
@@ -75,35 +120,33 @@ export const scoreSubmission = async ({
     testResults,
   });
 
-  try {
-    // Correct structure for the modern @google/genai SDK
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: userPrompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        // Forces Gemini to output pure JSON matching the exact schema definition
-        responseMimeType: "application/json",
-        responseSchema: aiScoringSchema,
-        maxOutputTokens: 1000,
+  const providers = AI_PROVIDER === 'auto' 
+    ? ['gemini', 'groq'] 
+    : [AI_PROVIDER];
+
+  let lastError;
+
+  for (const provider of providers) {
+    try {
+      if (provider === 'gemini') {
+        if (!process.env.GEMINI_API_KEY) {
+          throw new Error('GEMINI_API_KEY not configured');
+        }
+        console.log('🤖 Scoring with Gemini...');
+        return await scoreWithGemini(userPrompt);
+      } else if (provider === 'groq') {
+        if (!isGroqAvailable()) {
+          throw new Error('GROQ_API_KEY not configured');
+        }
+        console.log('🚀 Scoring with Groq (Llama 3.1 70B)...');
+        return await scoreWithGroq(userPrompt);
       }
-    });
-
-    // Extract the text parameter directly from the new response layout
-    const rawText = response.text;
-    const parsed = JSON.parse(rawText);
-
-    // Clamp scores defensively in case the model returns out-of-range values
-    const clamp = (n) => Math.max(0, Math.min(100, Math.round(Number(n || 0))));
-
-    return {
-      codeQualityScore: clamp(parsed.codeQualityScore),
-      approachScore: clamp(parsed.approachScore),
-      feedback: String(parsed.feedback || ""),
-      summary: String(parsed.summary || ""),
-    };
-
-  } catch (err) {
-    throw new Error(`Failed to parse or process AI scoring via Gemini: ${err.message}`);
+    } catch (err) {
+      console.warn(`⚠️ ${provider.toUpperCase()} scoring failed:`, err.message);
+      lastError = err;
+      continue; // Try next provider
+    }
   }
+
+  throw new Error(`All AI providers failed. Last error: ${lastError?.message}`);
 };

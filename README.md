@@ -179,6 +179,27 @@ A Record: www   → <your-vm-public-ip>
 2. Create API key
 3. Add to `.env`: `GROQ_API_KEY=your-key`
 
+### AI Provider Configuration
+Control which AI provider is used via `AI_PROVIDER` in `.env`:
+
+| Value | Behavior |
+|-------|----------|
+| `gemini` | Use only Google Gemini |
+| `groq` | Use only Groq (Llama 3.1 70B) |
+| `auto` | **Default** - Try Gemini first, fallback to Groq on failure |
+
+```bash
+# .env example
+AI_PROVIDER=auto  # Recommended: best of both worlds
+# AI_PROVIDER=groq  # Use only Groq (faster, higher rate limits)
+# AI_PROVIDER=gemini  # Use only Gemini
+```
+
+**Why use both?**
+- **Gemini**: Better structured JSON output, generous free tier (1,500/day)
+- **Groq**: Ultra-fast inference (~300 tokens/sec), massive free tier (14,400/day)
+- **Auto mode**: Best reliability - if one fails, the other takes over seamlessly
+
 ### MongoDB Atlas (or self-host)
 1. Go to [cloud.mongodb.com](https://cloud.mongodb.com)
 2. Create M0 Free cluster
@@ -306,6 +327,14 @@ DevBrawl/
 // Backend: Accepts avatarSelection field for default avatars (no Cloudinary needed)
 // Frontend: AvatarSelector component with emoji + personalized initials options
 // Files: Frontend/src/components/AvatarSelector.jsx, Registration.jsx
+```
+
+### 7. Dual AI Provider Support (NEW)
+```javascript
+// Both Gemini and Groq supported for question generation + code scoring
+// Configurable via AI_PROVIDER env: 'gemini' | 'groq' | 'auto' (fallback)
+// Files: Backend/src/utils/groq.js, aiScoringService.js, aiQuestionGenerator.js
+// Gemini: 1,500 req/day free | Groq: 14,400 req/day free (Llama 3.1 70B)
 ```
 
 ---
