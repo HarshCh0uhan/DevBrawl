@@ -1,10 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
-import { generateStructuredJSON, isGroqAvailable, GROQ_MODELS } from '../utils/groq.js';
+import { generateStructuredJSON as groqGenerate, isGroqAvailable } from '../utils/groq.js';
+import { generateStructuredJSON as openrouterGenerate, isOpenRouterAvailable } from '../utils/openrouter.js';
 
 const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const GEMINI_MODEL = "gemini-2.5-flash";
-const GROQ_MODEL = GROQ_MODELS.QUESTION_GEN;
 const AI_PROVIDER = process.env.AI_PROVIDER || 'auto';
 
 const questionResponseSchema = {
@@ -74,38 +74,63 @@ const generateWithGemini = async (topic, difficulty) => {
 
 // --- Groq Implementation ---
 const generateWithGroq = async (topic, difficulty) => {
-  const parsedData = await generateStructuredJSON({
+  const parsedData = await groqGenerate({
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: buildUserPrompt(topic, difficulty),
     schema: questionResponseSchema,
-    model: GROQ_MODEL,
+    temperature: 0.1,
+  });
+  return normalizeQuestion(parsedData);
+};
+
+// --- OpenRouter (Nemotron) Implementation ---
+const generateWithOpenRouter = async (topic, difficulty) => {
+  const parsedData = await openrouterGenerate({
+    systemPrompt: SYSTEM_PROMPT,
+    userPrompt: buildUserPrompt(topic, difficulty),
+    schema: questionResponseSchema,
     temperature: 0.1,
   });
   return normalizeQuestion(parsedData);
 };
 
 // --- Main Export with Fallback Logic ---
+// Provider order: configured provider first, then fallbacks
 export const generateQuestion = async (topic, difficulty = "medium") => {
-  const providers = AI_PROVIDER === 'auto' 
-    ? ['gemini', 'groq'] 
-    : [AI_PROVIDER];
+  // Build provider chain based on AI_PROVIDER setting
+  let providers;
+  switch (AI_PROVIDER) {
+    case 'gemini':
+      providers = ['gemini'];
+      break;
+    case 'groq':
+      providers = ['groq'];
+      break;
+    case 'openrouter':
+      providers = ['openrouter'];
+      break;
+    case 'auto':
+    default:
+      // Auto: try all in order of preference
+      providers = ['gemini', 'groq', 'openrouter'];
+  }
 
   let lastError;
 
   for (const provider of providers) {
     try {
       if (provider === 'gemini') {
-        if (!process.env.GEMINI_API_KEY) {
-          throw new Error('GEMINI_API_KEY not configured');
-        }
+        if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
         console.log('🤖 Generating question with Gemini...');
         return await generateWithGemini(topic, difficulty);
       } else if (provider === 'groq') {
-        if (!isGroqAvailable()) {
-          throw new Error('GROQ_API_KEY not configured');
-        }
-        console.log('🚀 Generating question with Groq (Llama 3.1 70B)...');
+        if (!isGroqAvailable()) throw new Error('GROQ_API_KEY not configured');
+        console.log('🚀 Generating question with Groq...');
         return await generateWithGroq(topic, difficulty);
+      } else if (provider === 'openrouter') {
+        if (!isOpenRouterAvailable()) throw new Error('OPENROUTER_API_KEY not configured');
+        console.log('🔮 Generating question with OpenRouter (Nemotron 3 Ultra)...');
+        return await generateWithOpenRouter(topic, difficulty);
       }
     } catch (err) {
       console.warn(`⚠️ ${provider.toUpperCase()} question generation failed:`, err.message);

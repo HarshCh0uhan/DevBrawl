@@ -1,13 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
-import { generateStructuredJSON, isGroqAvailable, GROQ_MODELS } from '../utils/groq.js';
+import { generateStructuredJSON as groqGenerate, isGroqAvailable, GROQ_MODELS } from '../utils/groq.js';
+import { generateStructuredJSON as openrouterGenerate, isOpenRouterAvailable } from '../utils/openrouter.js';
 
 const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Using the standard Gemini flash model signature
 const GEMINI_MODEL = "gemini-2.5-flash";
-const GROQ_MODEL = GROQ_MODELS.SCORING;
-
-// Which AI provider to use: 'gemini' | 'groq' | 'auto' (auto tries gemini first, falls back to groq)
 const AI_PROVIDER = process.env.AI_PROVIDER || 'auto';
 
 const SYSTEM_PROMPT = `You are an experienced technical interviewer reviewing a candidate's code submission in a live coding interview platform called DevBrawl.
@@ -92,11 +89,21 @@ const scoreWithGemini = async (userPrompt) => {
 
 // --- Groq Implementation ---
 const scoreWithGroq = async (userPrompt) => {
-  const parsed = await generateStructuredJSON({
+  const parsed = await groqGenerate({
     systemPrompt: SYSTEM_PROMPT,
     userPrompt,
     schema: aiScoringSchema,
-    model: GROQ_MODEL,
+    temperature: 0.1,
+  });
+  return normalizeResult(parsed);
+};
+
+// --- OpenRouter (Nemotron) Implementation ---
+const scoreWithOpenRouter = async (userPrompt) => {
+  const parsed = await openrouterGenerate({
+    systemPrompt: SYSTEM_PROMPT,
+    userPrompt,
+    schema: aiScoringSchema,
     temperature: 0.1,
   });
   return normalizeResult(parsed);
@@ -120,31 +127,44 @@ export const scoreSubmission = async ({
     testResults,
   });
 
-  const providers = AI_PROVIDER === 'auto' 
-    ? ['gemini', 'groq'] 
-    : [AI_PROVIDER];
+  // Build provider chain based on AI_PROVIDER setting
+  let providers;
+  switch (AI_PROVIDER) {
+    case 'gemini':
+      providers = ['gemini'];
+      break;
+    case 'groq':
+      providers = ['groq'];
+      break;
+    case 'openrouter':
+      providers = ['openrouter'];
+      break;
+    case 'auto':
+    default:
+      providers = ['gemini', 'groq', 'openrouter'];
+  }
 
   let lastError;
 
   for (const provider of providers) {
     try {
       if (provider === 'gemini') {
-        if (!process.env.GEMINI_API_KEY) {
-          throw new Error('GEMINI_API_KEY not configured');
-        }
+        if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
         console.log('🤖 Scoring with Gemini...');
         return await scoreWithGemini(userPrompt);
       } else if (provider === 'groq') {
-        if (!isGroqAvailable()) {
-          throw new Error('GROQ_API_KEY not configured');
-        }
-        console.log('🚀 Scoring with Groq (Llama 3.1 70B)...');
+        if (!isGroqAvailable()) throw new Error('GROQ_API_KEY not configured');
+        console.log('🚀 Scoring with Groq...');
         return await scoreWithGroq(userPrompt);
+      } else if (provider === 'openrouter') {
+        if (!isOpenRouterAvailable()) throw new Error('OPENROUTER_API_KEY not configured');
+        console.log('🔮 Scoring with OpenRouter (Nemotron 3 Ultra)...');
+        return await scoreWithOpenRouter(userPrompt);
       }
     } catch (err) {
       console.warn(`⚠️ ${provider.toUpperCase()} scoring failed:`, err.message);
       lastError = err;
-      continue; // Try next provider
+      continue;
     }
   }
 
