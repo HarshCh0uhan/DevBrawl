@@ -1,5 +1,5 @@
-
 import { createRoot } from 'react-dom/client'
+import { useEffect } from 'react'
 import './index.css'
 import App from './App.jsx'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
@@ -14,8 +14,20 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />
 }
 
+// Initialize auth session on app load
+function AuthInitializer() {
+  const restoreSession = useAuthStore((state) => state.restoreSession)
+
+  useEffect(() => {
+    restoreSession()
+  }, [restoreSession])
+
+  return null
+}
+
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
+    <AuthInitializer />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
