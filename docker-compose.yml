@@ -1,0 +1,122 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# DevBrawl - Local Development with Piston (No Docker-in-Docker needed!)
+# ──────────────────────────────────────────────────────────────────────────────
+# Usage: docker compose up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+version: "3.8"
+
+services:
+  # ─── MongoDB ────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: devbrawl-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=devbrawl
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devbrawl-network
+
+  # ─── Piston Code Execution Engine ───────────────────────────────────────────
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    container_name: devbrawl-piston
+    ports:
+      - "2000:2000"
+    volumes:
+      - piston_data:/piston
+    environment:
+      - PISTON_COMPILE_TIMEOUT=10000
+      - PISTON_RUN_TIMEOUT=10000
+      - PISTON_MAX_FILE_SIZE=100000
+      - PISTON_MAX_OUTPUT_SIZE=1000000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - devbrawl-network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ─── Backend API ────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile.dev
+    container_name: devbrawl-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
+      - MONGODB_URI=mongodb://mongodb:27017
+      - DB_NAME=devbrawl
+      - PISTON_API_URL=http://piston:2000
+      - FRONTEND_URL=http://localhost:5173
+    env_file:
+      - ./Backend/.env
+    volumes:
+      - ./Backend:/app
+      - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      piston:
+        condition: service_healthy
+    networks:
+      - devbrawl-network
+    develop:
+      watch:
+        - action: sync
+          path: ./Backend/src
+          target: /app/src
+        - action: rebuild
+          path: ./Backend/package.json
+
+  # ─── Frontend Dev Server ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile.dev
+    container_name: devbrawl-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules
+    networks:
+      - devbrawl-network
+    develop:
+      watch:
+        - action: sync
+          path: ./Frontend/src
+          target: /app/src
+        - action: rebuild
+          path: ./Frontend/package.json
+
+volumes:
+  mongodb_data:
+  piston_data:
+
+networks:
+  devbrawl-network:
+    driver: bridge

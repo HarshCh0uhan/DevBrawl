@@ -1,4 +1,4 @@
-import { executeCode, isRateLimited } from "../utils/codeExecutor.js";
+import { executeCode, isRateLimited } from "../utils/pistonExecutor.js";
 import { wrapCode } from "./codeWrapper.js";
 
 /**

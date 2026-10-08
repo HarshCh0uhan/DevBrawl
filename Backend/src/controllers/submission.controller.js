@@ -1,7 +1,7 @@
 
 import { Question } from "../model/question.model.js";
 import { Submission } from "../model/submission.model.js";
-import { executeAgainstTestCases, isRateLimited } from "../utils/codeExecutor.js";
+import { executeAgainstTestCases, isRateLimited } from "../utils/pistonExecutor.js";
 import { wrapCode } from "./codeWrapper.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
