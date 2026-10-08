@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import AvatarSelector from '../components/AvatarSelector';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -12,7 +13,8 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [avatar, setAvatar] = useState(null);
+  const [avatar, setAvatar] = useState(null); // File upload
+  const [avatarSelection, setAvatarSelection] = useState('emoji-1'); // Default emoji avatar
 
   // UI Status State
   const [error, setError] = useState('');
@@ -21,7 +23,15 @@ export default function RegisterPage() {
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setAvatar(e.target.files[0]);
+      // Clear selection when user uploads custom image
+      setAvatarSelection(null);
     }
+  };
+
+  const handleAvatarSelect = (avatarId) => {
+    setAvatarSelection(avatarId);
+    // Clear file when user selects default avatar
+    setAvatar(null);
   };
 
   const handleSubmit = async (e) => {
@@ -29,29 +39,27 @@ export default function RegisterPage() {
     setError('');
     setIsLoading(true);
 
-    // Validation check for the mandatory file input
-    if (!avatar) {
-      setError('Please upload an avatar image');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // 1. Build multipart FormData to support file transmission
+      // Build multipart FormData
       const formData = new FormData();
       formData.append('email', email);
       formData.append('password', password);
       formData.append('fullName', fullName);
       formData.append('username', username);
       formData.append('phoneNumber', phoneNumber);
-      formData.append('avatar', avatar); // The file object binary
+      
+      // Only append avatar file if user uploaded one
+      if (avatar) {
+        formData.append('avatar', avatar);
+      }
+      
+      // Always send avatarSelection (default emoji or null if custom upload)
+      formData.append('avatarSelection', avatarSelection || '');
 
-      // 2. Dispatch to your Zustand store register action
       const result = await register(formData);
       setIsLoading(false);
 
       if (result.success) {
-        // Automatically redirects to workspace dashboard on success
         navigate('/login');
       } else {
         setError(result.error || 'Registration failed');
@@ -141,23 +149,40 @@ export default function RegisterPage() {
             />
           </div>
 
+          {/* Avatar Selection Section */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Profile Avatar</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="w-full text-sm text-slate-400 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer disabled:opacity-50"
-              disabled={isLoading}
-              required
-            />
+            <label className="block text-sm font-medium text-slate-300 mb-3">Profile Avatar <span className="text-slate-500 font-normal">(optional)</span></label>
+            
+            {/* Default Avatar Options */}
+            <div className="mb-4">
+              <p className="text-xs text-slate-500 mb-2">Choose a default avatar:</p>
+              <AvatarSelector 
+                selectedAvatar={avatarSelection}
+                onSelect={handleAvatarSelect}
+                username={username}
+              />
+            </div>
+
+            {/* Custom Upload Option */}
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="w-full text-sm text-slate-400 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer disabled:opacity-50 cursor-pointer"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Or upload your own image (max 5MB)
+              </p>
+            </div>
           </div>
 
           <button
             type="submit"
             className={`w-full rounded-md py-2.5 text-base font-bold text-white transition focus:outline-none mt-2 ${
-              isLoading 
-                ? 'bg-slate-600 cursor-not-allowed' 
+              isLoading
+                ? 'bg-slate-600 cursor-not-allowed'
                 : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
             }`}
             disabled={isLoading}
