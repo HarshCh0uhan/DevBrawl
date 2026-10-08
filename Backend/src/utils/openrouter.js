@@ -1,24 +1,17 @@
 import fetch from 'node-fetch';
 
 // OpenRouter configuration for Nemotron 3 Nano Omni (free)
+// Model from: https://openrouter.ai/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free?view=api
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Correct free model name from OpenRouter catalog
-const NEMOTRON_MODEL = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'; // Nemotron 3 Nano Omni (free)
 
 export const OPENROUTER_MODELS = {
-  PRIMARY: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-  BACKUP: 'nvidia/nemotron-3-ultra-550b-a55b:free', // Fallback to Ultra if Nano fails
+  PRIMARY: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',  // Nemotron 3 Nano Omni (free)
+  BACKUP: 'nvidia/nemotron-3-ultra-550b-a55b:free',                 // Fallback
 };
 
 /**
  * Generate structured JSON response using OpenRouter (Nemotron 3 Nano Omni)
- * @param {Object} params
- * @param {string} params.systemPrompt - System instruction
- * @param {string} params.userPrompt - User prompt
- * @param {Object} params.schema - JSON schema for response validation (optional)
- * @param {string} params.model - Model to use (default: Nemotron 3 Ultra free)
- * @param {number} params.temperature - Temperature (default: 0.1)
- * @returns {Promise<Object>} Parsed JSON response
+ * Some free models don't support response_format json_object, so we handle both cases
  */
 export const generateStructuredJSON = async ({
   systemPrompt,
@@ -32,55 +25,106 @@ export const generateStructuredJSON = async ({
     throw new Error('OPENROUTER_API_KEY not configured');
   }
 
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://devbrawl.local',
-      'X-Title': 'DevBrawl',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
-    }),
-  });
+  const modelsToTry = [
+    { model, useJsonMode: true },
+    { model, useJsonMode: false },  // Retry without JSON mode if first fails
+  ];
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+  // If primary fails, try backup model
+  if (model === OPENROUTER_MODELS.PRIMARY) {
+    modelsToTry.push(
+      { model: OPENROUTER_MODELS.BACKUP, useJsonMode: true },
+      { model: OPENROUTER_MODELS.BACKUP, useJsonMode: false },
+    );
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  
-  if (!content) throw new Error('Empty response from OpenRouter');
+  let lastError;
 
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (e) {
-    throw new Error(`Failed to parse JSON from OpenRouter: ${e.message}`);
+  for (const { model: modelName, useJsonMode } of modelsToTry) {
+    try {
+      console.log(`🔮 Trying OpenRouter: ${modelName} (jsonMode: ${useJsonMode})`);
+
+      const body = {
+        model: modelName,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature,
+        max_tokens: 4000,  // Increased for reasoning models
+      };
+
+      // Only add response_format if useJsonMode is true
+      if (useJsonMode) {
+        body.response_format = { type: 'json_object' };
+      }
+
+      const response = await fetch(OPENROUTER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://devbrawl.local',
+          'X-Title': 'DevBrawl',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      // Debug: log full response structure
+      console.log(`📥 OpenRouter response:`, JSON.stringify({
+        id: data.id,
+        model: data.model,
+        choices: data.choices?.map(c => ({
+          finish_reason: c.finish_reason,
+          content_length: c.message?.content?.length || 0,
+          content_preview: c.message?.content?.slice(0, 200) || 'EMPTY',
+        })) || [],
+        usage: data.usage,
+      }, null, 2));
+
+      const content = data.choices?.[0]?.message?.content;
+      
+      if (!content || content.trim() === '') {
+        throw new Error('Empty response content from OpenRouter');
+      }
+
+      let parsed;
+      try {
+        // Try to extract JSON from response (might be wrapped in markdown)
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : content;
+        parsed = JSON.parse(jsonStr);
+      } catch (e) {
+        console.error(`❌ Failed to parse JSON from OpenRouter. Content: ${content.slice(0, 500)}`);
+        throw new Error(`Failed to parse JSON from OpenRouter: ${e.message}`);
+      }
+
+      // Normalize to Mongoose schema
+      if (schema) {
+        parsed = normalizeToMongooseSchema(parsed, schema);
+      }
+
+      console.log(`✅ OpenRouter success with model: ${modelName} (jsonMode: ${useJsonMode})`);
+      return parsed;
+    } catch (e) {
+      lastError = e;
+      console.warn(`⚠️ OpenRouter attempt failed (${modelName}, jsonMode: ${useJsonMode}): ${e.message}`);
+      continue;
+    }
   }
 
-  // Normalize to Mongoose schema (same as Groq)
-  if (schema) {
-    parsed = normalizeToMongooseSchema(parsed, schema);
-  }
-
-  console.log(`✅ OpenRouter success with model: ${model}`);
-  return parsed;
+  throw new Error(`All OpenRouter models/modes failed. Last error: ${lastError?.message}`);
 };
 
 /**
  * Normalize OpenRouter response to EXACT Mongoose question schema
- * (Same normalization logic as Groq for consistency)
  */
 function normalizeToMongooseSchema(parsed, schema) {
   const normalized = { ...parsed };
@@ -254,7 +298,7 @@ export const generateText = async ({
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
-};
+}
 
 /**
  * Check if OpenRouter is available/configured
