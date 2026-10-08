@@ -337,6 +337,14 @@ DevBrawl/
 // Gemini: 1,500 req/day free | Groq: 14,400 req/day free (Llama 3.1 70B)
 ```
 
+### 8. JWT Token Auto-Refresh (NEW)
+```javascript
+// Automatic token refresh before socket connection
+// Stores refresh token, checks expiry on app init, refreshes if needed
+// Files: Frontend/src/store/authStore.js, Backend/src/routes/user.routes.js
+// Endpoint: POST /api/v1/users/refresh-token
+```
+
 ---
 
 ## 🧪 Testing
