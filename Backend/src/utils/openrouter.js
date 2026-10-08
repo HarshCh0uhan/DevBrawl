@@ -19,6 +19,8 @@ export const generateStructuredJSON = async ({
   schema,
   model = OPENROUTER_MODELS.PRIMARY,
   temperature = 0.1,
+  topic,      // Optional: for normalization fallback
+  difficulty, // Optional: for normalization fallback
 }) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -108,7 +110,7 @@ export const generateStructuredJSON = async ({
 
       // Normalize to Mongoose schema
       if (schema) {
-        parsed = normalizeToMongooseSchema(parsed, schema);
+        parsed = normalizeToMongooseSchema(parsed, schema, topic, difficulty);
       }
 
       console.log(`✅ OpenRouter success with model: ${modelName} (jsonMode: ${useJsonMode})`);
@@ -126,7 +128,7 @@ export const generateStructuredJSON = async ({
 /**
  * Normalize OpenRouter response to EXACT Mongoose question schema
  */
-function normalizeToMongooseSchema(parsed, schema) {
+function normalizeToMongooseSchema(parsed, schema, topic, difficulty) {
   const normalized = { ...parsed };
   
   // 1. Map common field name variations
@@ -225,8 +227,8 @@ function normalizeToMongooseSchema(parsed, schema) {
     ];
   }
 
-  // 5. Ensure required top-level fields
-  if (!normalized.topic) normalized.topic = 'General Programming';
+  // 5. Ensure required top-level fields - use passed-in topic/difficulty as fallback
+  if (!normalized.topic) normalized.topic = topic || 'General Programming';
   if (!normalized.title) normalized.title = 'Untitled Problem';
   if (!normalized.promptLines || normalized.promptLines.length === 0) {
     normalized.promptLines = ['Solve this programming problem.'];
@@ -236,11 +238,11 @@ function normalizeToMongooseSchema(parsed, schema) {
   }
   if (!normalized.timeLimitMs) normalized.timeLimitMs = 10000;
 
-  // 6. Ensure difficulty is valid enum
+  // 6. Ensure difficulty is valid enum - use passed-in difficulty as fallback
   if (normalized.difficulty && !['easy', 'medium', 'hard'].includes(normalized.difficulty)) {
     normalized.difficulty = 'medium';
   } else if (!normalized.difficulty) {
-    normalized.difficulty = 'medium';
+    normalized.difficulty = difficulty || 'medium';
   }
 
   // 7. Remove any extra fields not in Mongoose schema

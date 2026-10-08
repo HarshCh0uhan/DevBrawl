@@ -90,6 +90,8 @@ const generateWithOpenRouter = async (topic, difficulty) => {
     userPrompt: buildUserPrompt(topic, difficulty),
     schema: questionResponseSchema,
     temperature: 0.1,
+    topic,      // Pass topic for normalization fallback
+    difficulty, // Pass difficulty for normalization fallback
   });
   return normalizeQuestion(parsedData);
 };
