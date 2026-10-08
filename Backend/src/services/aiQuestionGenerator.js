@@ -47,12 +47,14 @@ Your output must be a single, raw, clean JSON object matching the provided schem
 Never use literal newlines inside any string value. Break paragraphs up into separate array items instead.
 Do not include any backticks or markdown fences (\`\`\`json) outside the structural fields.`;
 
-const normalizeQuestion = (parsedData) => ({
+const normalizeQuestion = (parsedData, topic, difficulty) => ({
   title: parsedData.title,
   prompt: parsedData.promptLines.join("\n"),
-  constraints: parsedData.constraintsLines.join("\n"),
-  timeLimitMs: Number(parsedData.timeLimitMs || 2000),
+  constraints: (parsedData.constraintsLines || []).join("\n"),
+  timeLimitMs: Number(parsedData.timeLimitMs || 10000),
   testCases: parsedData.testCases,
+  topic,
+  difficulty,
 });
 
 // --- Gemini Implementation ---
@@ -69,7 +71,7 @@ const generateWithGemini = async (topic, difficulty) => {
   });
 
   const parsedData = JSON.parse(response.text);
-  return normalizeQuestion(parsedData);
+  return normalizeQuestion(parsedData, topic, difficulty);
 };
 
 // --- Groq Implementation ---
@@ -80,7 +82,7 @@ const generateWithGroq = async (topic, difficulty) => {
     schema: questionResponseSchema,
     temperature: 0.1,
   });
-  return normalizeQuestion(parsedData);
+  return normalizeQuestion(parsedData, topic, difficulty);
 };
 
 // --- OpenRouter (Nemotron) Implementation ---
@@ -93,7 +95,7 @@ const generateWithOpenRouter = async (topic, difficulty) => {
     topic,      // Pass topic for normalization fallback
     difficulty, // Pass difficulty for normalization fallback
   });
-  return normalizeQuestion(parsedData);
+  return normalizeQuestion(parsedData, topic, difficulty);
 };
 
 // --- Main Export with Fallback Logic ---
