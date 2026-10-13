@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRoomStore } from '../store/roomStore';
-import QuestionPanel from './QuestionPanel';
+import QuestionPanel from './Questionpanel';
 
 export default function SidebarManager({ 
   questionPanelOpen, 

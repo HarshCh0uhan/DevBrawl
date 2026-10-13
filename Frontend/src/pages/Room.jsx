@@ -8,7 +8,7 @@ import ArenaLeaderboard from '../components/leaderBoard';
 
 import RoomHeader from '../components/RoomHeader';
 import WorkspaceLayout from '../components/WorkspaceLayout';
-import SidebarManager from '../components/SidebarManager';
+import SidebarManager from '../components/SideBarManager';
 
 export default function RoomPage() {
   const { inviteCode } = useParams();
