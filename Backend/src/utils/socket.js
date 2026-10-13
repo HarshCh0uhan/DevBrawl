@@ -4,7 +4,7 @@ import { Room } from "../model/room.model.js";
 import { Submission } from "../model/submission.model.js";
 import { setIoInstance } from "../services/aiScoringQueue.js";
 import { leaveRoomInternal } from "../controllers/room.controller.js";
-import { compileAndBroadcastLeaderboard } from "../services/leaderboard.service.js";
+import { compileAndBroadcastLeaderboard } from "../services/leaderBoard.service.js";
 
 import { registerRoomHandlers } from "../handlers/room.handler.js";
 import { registerSyncHandlers } from "../handlers/canvasSync.handler.js";
@@ -61,9 +61,17 @@ export const advanceTurn = async (roomCode) => {
 };
 
 export const initializeSocket = (httpServer) => {
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5500",
+    "null",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+
   const io = new Server(httpServer, {
     cors: {
-      origin: ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5500", "null"],
+      origin: allowedOrigins,
       credentials: true,
     }
   });

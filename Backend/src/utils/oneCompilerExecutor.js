@@ -4,13 +4,6 @@ import fetch from "node-fetch";
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST;
 
-if (!RAPIDAPI_KEY || !RAPIDAPI_HOST) {
-  throw new Error(
-    "Missing required environment variables: RAPIDAPI_KEY and RAPIDAPI_HOST must be set for OneCompiler executor"
-  );
-}
-
-const ONCOMPILER_API_URL = `https://${RAPIDAPI_HOST}/api/v1/run`;
 const MAX_SOURCE_SIZE = 100 * 1024; // 100KB
 const USER_RATE_LIMIT = 10; // per minute
 
@@ -42,6 +35,11 @@ const ONECOMPILER_LANGUAGES = {
 
 // ─── Core: Execute via OneCompiler API ────────────────────────────────────────
 const executeOneCompiler = async (sourceCode, languageId, stdin = "") => {
+  // Validate env vars at call time (not import time) so health checks don't crash
+  if (!RAPIDAPI_KEY || !RAPIDAPI_HOST) {
+    throw new Error("RAPIDAPI_KEY / RAPIDAPI_HOST not configured");
+  }
+
   const langConfig = ONECOMPILER_LANGUAGES[languageId];
   if (!langConfig) {
     throw new Error(`Unsupported language ID: ${languageId}`);
