@@ -6,6 +6,7 @@ export const useRoomStore = create((set) => ({
   hostId: null,
   participants: [],
   activeQuestion: null,
+  currentRound: 1,
   
   // Turn State Sync
   turnStatus: 'waiting', // 'waiting' | 'turn_active' | 'all_done'
@@ -13,6 +14,10 @@ export const useRoomStore = create((set) => ({
   activeUsername: '',
   turnIndex: 0,
   totalPlayers: 0,
+  
+  // Phase-2 AI Scoring Status
+  phase2Status: 'idle',   // 'idle' | 'reviewing' | 'completed' | 'failed'
+  phase2Payload: null,
 
   // ── MUTATORS / ACTIONS ───────────────────────────────────────────────────
   // Initial Room Setup when joining
@@ -22,11 +27,19 @@ export const useRoomStore = create((set) => ({
     participants: roomData.participants || [],
     totalPlayers: roomData.participants?.length || 0,
     turnStatus: roomData.gameStatus || 'waiting',
+    currentRound: 1,
   }),
 
   // Dynamic Workspace Synchers
   setParticipants: (list) => set({ participants: list, totalPlayers: list.length }),
   setActiveQuestion: (question) => set({ activeQuestion: question }),
+  setCurrentRound: (n) => set({ currentRound: n }),
+  
+  // Phase-2 AI Scoring Status
+  setPhase2Reviewing: (data) => set({ phase2Status: 'reviewing', phase2Payload: data }),
+  setPhase2Complete: (data) => set({ phase2Status: 'completed', phase2Payload: data }),
+  setPhase2Failed: (data) => set({ phase2Status: 'failed', phase2Payload: data }),
+  resetPhase2: () => set({ phase2Status: 'idle', phase2Payload: null }),
   
   // Real-time Turn Mechanics Sync
   syncTurnStart: (data) => set({
@@ -56,10 +69,13 @@ export const useRoomStore = create((set) => ({
     hostId: null,
     participants: [],
     activeQuestion: null,
+    currentRound: 1,
     turnStatus: 'waiting',
     activePlayerId: null,
     activeUsername: '',
     turnIndex: 0,
-    totalPlayers: 0
+    totalPlayers: 0,
+    phase2Status: 'idle',
+    phase2Payload: null
   })
 }));

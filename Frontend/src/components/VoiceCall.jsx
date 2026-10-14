@@ -40,14 +40,6 @@ export default function VoiceCall({ roomName }) {
     }
   }
 
-//   const leaveCall = async () => {
-//     await roomRef.current?.disconnect()
-//     roomRef.current = null
-//     setJoined(false)
-//     setMuted(false)
-//     setParticipants([])
-//   }
-
   const toggleMute = async () => {
     await roomRef.current?.localParticipant.setMicrophoneEnabled(muted)
     setMuted(!muted)
@@ -55,9 +47,15 @@ export default function VoiceCall({ roomName }) {
 
   useEffect(() => {
     return () => {
-      roomRef.current?.disconnect()
-    }
-  }, [])
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
+      }
+      setJoined(false);
+      setMuted(false);
+      setParticipants([]);
+    };
+  }, [roomName]);
 
   return (
     <div className="flex items-center gap-2">

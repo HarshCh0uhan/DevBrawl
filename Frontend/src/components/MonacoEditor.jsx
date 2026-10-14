@@ -1,4 +1,3 @@
-
 import Editor from '@monaco-editor/react'
 import { useEffect, useRef, useState } from 'react'
 import { socket } from '../utils/socket'
@@ -51,6 +50,41 @@ export default function MonacoEditor({
     })
     return () => socket.off("receive-code-change")
   }, [roomId])
+
+  // Reconnect / new joiner code resync
+  useEffect(() => {
+    if (!roomId) return;
+
+    const requestCodeSnapshot = () => {
+      socket.emit("code-state-request", { roomId });
+    };
+
+    socket.on("connect", requestCodeSnapshot);
+
+    socket.on("code-state-response", (data) => {
+      if (!editorRef.current) return;
+      if (data?.roomId !== roomId) return;
+      if (!data.code) return;
+      // Only apply if the incoming snapshot differs from current buffer
+      // (avoid clobbering the user's local unsent edits)
+      const current = editorRef.current.getValue();
+      if (current !== data.code) {
+        isRemoteChange.current = true;
+        const pos = editorRef.current.getPosition();
+        editorRef.current.setValue(data.code);
+        if (pos) editorRef.current.setPosition(pos);
+        isRemoteChange.current = false;
+      }
+    });
+
+    // Fire once on mount if already connected
+    if (socket.connected) requestCodeSnapshot();
+
+    return () => {
+      socket.off("connect", requestCodeSnapshot);
+      socket.off("code-state-response");
+    };
+  }, [roomId]);
 
   const handleRunCode = async () => {
     if (!editorRef.current || isRunning || readOnly) return
@@ -157,7 +191,7 @@ export default function MonacoEditor({
                   isSubmitting
                     ? 'bg-slate-800 text-slate-500 border-slate-700 animate-pulse'
                     : 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-500 active:scale-95'
-                }`}
+              }`}
               >
                 {isSubmitting ? 'Submitting...' : '🚀 Submit_Brawl'}
               </button>
@@ -165,6 +199,7 @@ export default function MonacoEditor({
 
           </div>
         )}
+
       </div>
 
       {/* Terminal drawer */}
@@ -186,6 +221,7 @@ export default function MonacoEditor({
         <div className="flex-1 p-4 overflow-y-auto font-mono text-xs text-left bg-slate-950/40 text-slate-300 selection:bg-slate-800 break-all whitespace-pre-wrap">
           {terminalOutput}
         </div>
+
       </div>
 
     </div>

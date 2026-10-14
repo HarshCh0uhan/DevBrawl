@@ -1,4 +1,3 @@
-
 import { Tldraw, useEditor } from 'tldraw'
 import { useEffect, useRef } from 'react'
 import { socket } from './socket'
@@ -12,35 +11,33 @@ function SyncedCanvas({ roomId }) {
 
     socket.roomId = roomId;
 
-const cleanupListener = editor.store.listen((update) => {
-  if (isRemoteChange.current) return
+    const cleanupListener = editor.store.listen((update) => {
+      if (isRemoteChange.current) return
 
-  const { changes } = update;
-  
-  const payload = {
-    roomId,
-    added: changes.added,
-    updated: changes.updated,
-    removed: changes.removed,
-  }
+      const { changes } = update;
+      
+      const payload = {
+        roomId,
+        added: changes.added,
+        updated: changes.updated,
+        removed: changes.removed,
+      }
 
-  if (
-    Object.keys(payload.added).length > 0 ||
-    Object.keys(payload.updated).length > 0 ||
-    Object.keys(payload.removed).length > 0
-  ) {
-    // console.log("📤 emitting canvas-change:", payload)
-    socket.emit("canvas-change", payload)
-  }
-}, { source: 'user', scope: 'document' })
-
+      if (
+        Object.keys(payload.added).length > 0 ||
+        Object.keys(payload.updated).length > 0 ||
+        Object.keys(payload.removed).length > 0
+      ) {
+        // console.log("📤 emitting canvas-change:", payload)
+        socket.emit("canvas-change", payload)
+      }
+    }, { source: 'user', scope: 'document' })
 
     socket.on("receive-canvas-change", (data) => {
-    // console.log("📥 received canvas-change:", data)
+      // console.log("📥 received canvas-change:", data)
       isRemoteChange.current = true
 
       editor.store.mergeRemoteChanges(() => {
-    
         if (data.removed && Object.keys(data.removed).length > 0) {
           Object.keys(data.removed).forEach((id) => {
             if (editor.store.has(id)) editor.store.remove([id])
@@ -63,9 +60,32 @@ const cleanupListener = editor.store.listen((update) => {
       isRemoteChange.current = false
     })
 
+    // Request full state when socket connects OR reconnects
+    const requestSnapshot = () => {
+      socket.emit("canvas-state-request", { roomId });
+    };
+
+    socket.on("connect", requestSnapshot);
+    socket.on("canvas-state-response", (data) => {
+      if (!data?.records) return;
+      isRemoteChange.current = true;
+      editor.store.mergeRemoteChanges(() => {
+        const records = Object.values(data.records);
+        if (records.length > 0) {
+          editor.store.put(records);
+        }
+      });
+      isRemoteChange.current = false;
+    });
+
+    // Fire once on mount in case socket is already connected
+    if (socket.connected) requestSnapshot();
+
     return () => {
       cleanupListener()
       socket.off("receive-canvas-change")
+      socket.off("connect", requestSnapshot);
+      socket.off("canvas-state-response");
     }
   }, [editor, roomId])
 

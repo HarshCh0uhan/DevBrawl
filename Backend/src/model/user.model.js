@@ -4,52 +4,15 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
     {
-        username: {
-            type: String,
-            required: true,
-            unique: true,
-            lowercase: true,
-            trim: true,
-            index: true
-        },
-        email: {
-            type: String,
-            required: true,
-            unique: true,
-            lowercase: true,
-            trim: true,
-        },
-        fullName: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        password: {
-            type: String,
-            required: [true, 'Password is required']
-        },
-        avatar: {
-            type: String, 
-            default: ""
-        },
-        role: {
-            type: String,
-            enum: ["ADMIN", "STUDENT"],
-            default: "STUDENT"
-        },
-        phoneNumber: {
-            type: String,
-            required: true,
-            trim: true
-        },
-
-        refreshToken: {
-            type: String
-        }
+        username: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
+        email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+        fullName: { type: String, required: true, trim: true },
+        password: { type: String, required: [true, 'Password is required'] },
+        avatar: { type: String, default: "" },
+        role: { type: String, enum: ["ADMIN", "STUDENT"], default: "STUDENT" },
+        phoneNumber: { type: String, required: true, trim: true },
     },
-    {
-        timestamps: true
-    }
+    { timestamps: true }
 );
 
 userSchema.pre("save", async function () {
@@ -63,28 +26,9 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 
 userSchema.methods.generateAccessToken = function () {
     return jwt.sign(
-        {
-            _id: this._id,
-            email: this.email,
-            username: this.username,
-            role: this.role
-        },
+        { _id: this._id, email: this.email, username: this.username, role: this.role },
         process.env.ACCESS_TOKEN_SECRET,
-        {
-            expiresIn: process.env.ACCESS_TOKEN_EXPIRY
-        }
-    );
-};
-
-userSchema.methods.generateRefreshToken = function () {
-    return jwt.sign(
-        {
-            _id: this._id,
-        },
-        process.env.REFRESH_TOKEN_SECRET,
-        {
-            expiresIn: process.env.REFRESH_TOKEN_EXPIRY
-        }
+        { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "7d" }
     );
 };
 

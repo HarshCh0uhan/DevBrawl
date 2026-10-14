@@ -22,6 +22,16 @@ export const advanceTurn = async (roomCode) => {
   const room = await Room.findOne({ inviteCode: normalizedRoomCode });
   if (!room || !room.participants || room.participants.length === 0) return;
 
+  // Emit turn-ended for the CURRENT player before advancing
+  const endingPlayer = room.participants[room.currentTurnIndex];
+  if (endingPlayer) {
+    io.to(normalizedRoomCode).emit("turn-ended", {
+      endedPlayerId: (endingPlayer.userId || endingPlayer._id).toString(),
+      endedUsername: endingPlayer.username,
+      turnIndex: room.currentTurnIndex,
+    });
+  }
+
   room.currentTurnIndex = (room.currentTurnIndex || 0) + 1;
   const allDone = room.currentTurnIndex >= room.participants.length;
 
@@ -47,6 +57,19 @@ export const advanceTurn = async (roomCode) => {
     }
   } else {
     const nextPlayer = room.participants[room.currentTurnIndex];
+
+    // Guard: participant may have left between reads
+    if (!nextPlayer) {
+      room.activePlayerId = null;
+      room.gameStatus = "all_done";
+      await room.save();
+
+      io.to(normalizedRoomCode).emit("all-turns-complete", {
+        message: "All players have completed their turns. Compiling standings...",
+      });
+      return;
+    }
+
     room.gameStatus = "turn_active";
     room.activePlayerId = nextPlayer.userId ? nextPlayer.userId : nextPlayer._id;
     await room.save();
@@ -71,8 +94,13 @@ export const initializeSocket = (httpServer) => {
 
   const io = new Server(httpServer, {
     cors: {
-      origin: allowedOrigins,
-      credentials: true,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+        if (allowedOrigins.includes(origin)) return callback(null, true)
+        if (origin.endsWith('.vercel.app')) return callback(null, true)
+        return callback(new Error(`Socket CORS blocked: ${origin}`))
+      },
+      credentials: false,
     }
   });
 
