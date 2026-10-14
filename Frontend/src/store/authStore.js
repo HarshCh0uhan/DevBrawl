@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import api from '../utils/axios'
 import { socket } from '../utils/socket'
 import { jwtDecode } from 'jwt-decode'
@@ -9,10 +9,9 @@ export const useAuthStore = create(
     (set, get) => ({
       user: null,
       token: null,
-      refreshToken: null,
       isAuthenticated: false,
+      hasHydrated: false,
 
-      // --- Helper: Check if token is expired ---
       isTokenExpired: (token) => {
         if (!token) return true
         try {
@@ -23,121 +22,77 @@ export const useAuthStore = create(
         }
       },
 
-      // --- Helper: Refresh access token ---
-      refreshAccessToken: async () => {
-        const { refreshToken } = get()
-        if (!refreshToken) {
-          console.warn('No refresh token available')
-          return false
-        }
-
-        try {
-          const response = await api.post('/users/refresh-token', { refreshToken })
-          const { accessToken, refreshToken: newRefreshToken } = response.data.data
-
-          set({ token: accessToken, refreshToken: newRefreshToken })
-          socket.auth = { token: accessToken }
-          return true
-        } catch (error) {
-          console.error('Token refresh failed:', error)
-          // Refresh failed - logout user
-          get().logout()
-          return false
-        }
-      },
-
-      // --- Ensure valid token before socket connection ---
-      ensureValidToken: async () => {
-        const { token, isTokenExpired, refreshAccessToken } = get()
-        
-        if (!token) return false
-        
-        if (isTokenExpired(token)) {
-          console.log('🔄 Access token expired, refreshing...')
-          return await refreshAccessToken()
-        }
-        return true
-      },
-
-      // --- LOGIN ACTION ---
       login: async (email, password) => {
         try {
           const response = await api.post('/users/login', { email, password })
-          
-          const { user, accessToken, refreshToken } = response.data.data
+          const { user, accessToken } = response.data.data
 
           set({
             user,
             token: accessToken,
-            refreshToken,
             isAuthenticated: true,
           })
-          
-          // Connect socket with fresh token
+
           socket.auth = { token: accessToken }
-          socket.connect()
+          if (!socket.connected) socket.connect()
 
           return { success: true }
         } catch (error) {
-          console.error("Login client error:", error?.response?.data?.message || error.message)
-          return { 
-            success: false, 
-            error: error?.response?.data?.message || "Invalid credentials. Please try again." 
-          }
+          const msg = error?.response?.data?.message || error.message || "Invalid credentials"
+          console.error("Login client error:", msg)
+          return { success: false, error: msg }
         }
       },
 
-      // --- REGISTER ACTION ---
       register: async (formData) => {
         try {
           await api.post('/users/register', formData)
           return { success: true }
         } catch (error) {
-          return { 
-            success: false, 
-            error: error?.response?.data?.message || "Registration failed." 
+          return {
+            success: false,
+            error: error?.response?.data?.message || "Registration failed."
           }
         }
       },
 
-      // --- RESTORE SESSION (call on app init) ---
-      restoreSession: async () => {
-        const { token, refreshToken, isTokenExpired, refreshAccessToken } = get()
-        
-        if (!token || !refreshToken) {
+      // Runs on app mount. Synchronously validates the persisted token.
+      restoreSession: () => {
+        const { token, isTokenExpired } = get()
+
+        if (!token || isTokenExpired(token)) {
+          // Token missing or expired — clear silently, no API call
+          set({ user: null, token: null, isAuthenticated: false })
           return false
         }
 
-        if (isTokenExpired(token)) {
-          console.log('🔄 Restoring session: token expired, refreshing...')
-          return await refreshAccessToken()
-        }
-        
-        // Token still valid, connect socket
         socket.auth = { token }
-        socket.connect()
+        if (!socket.connected) socket.connect()
         return true
       },
 
-      // --- LOGOUT ACTION ---
+      setHasHydrated: (v) => set({ hasHydrated: v }),
+
       logout: () => {
-        socket.disconnect()
+        if (socket.connected) socket.disconnect()
         set({
           user: null,
           token: null,
-          refreshToken: null,
           isAuthenticated: false,
         })
       },
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
         token: state.token,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
     }
   )
 )

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../utils/socket';
@@ -77,11 +76,52 @@ export default function RoomPage() {
       console.log("📥 FRONTEND: 'all-turns-complete' received! Mounting loading screen overlay...");
       store.setAllTurnsComplete();
       setArenaSummary({ loading: true, leaderboard: [], winnerName: null, feedback: "" });
+
+      // Safety net: if match-summary-ready never arrives in 45s, dismiss spinner
+      const fallbackTimer = setTimeout(() => {
+        setArenaSummary((prev) => {
+          if (prev?.loading) {
+            return {
+              leaderboard: [],
+              feedback: "Score compilation timed out. Check with the host.",
+              winnerName: null,
+            };
+          }
+          return prev;
+        });
+      }, 45000);
+
+      // Clear timer as soon as real summary arrives
+      socket.once("match-summary-ready", () => clearTimeout(fallbackTimer));
     });
 
     socket.on("match-summary-ready", (data) => {
       console.log("🏆 FRONTEND: 'match-summary-ready' arrived with payload:", data);
       setArenaSummary(data);
+    });
+
+    // Phase-2 AI scoring events
+    socket.on("phase2-reviewing", (data) => {
+      store.setPhase2Reviewing(data);
+    });
+
+    socket.on("phase2-complete", (data) => {
+      store.setPhase2Complete(data);
+    });
+
+    socket.on("phase2-failed", (data) => {
+      store.setPhase2Failed(data);
+      // Ensure spinner is dismissed even if leaderboard never arrives
+      setArenaSummary((prev) => {
+        if (prev?.loading) {
+          return {
+            leaderboard: [],
+            feedback: "AI scoring failed — showing provisional scores.",
+            winnerName: null,
+          };
+        }
+        return prev;
+      });
     });
 
     return () => {
@@ -94,6 +134,9 @@ export default function RoomPage() {
       socket.off("turn-skipped");
       socket.off("all-turns-complete");
       socket.off("match-summary-ready");
+      socket.off("phase2-reviewing");
+      socket.off("phase2-complete");
+      socket.off("phase2-failed");
       store.clearRoomStore();
     };
   }, [inviteCode, navigate]);

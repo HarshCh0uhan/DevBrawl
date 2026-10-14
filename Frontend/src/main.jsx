@@ -1,7 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { useEffect } from 'react'
 import './index.css'
-import App from './App.jsx'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/Login.jsx'
 import { useAuthStore } from './store/authStore.js'
@@ -11,10 +10,19 @@ import RoomPage from './pages/Room.jsx'
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  return isAuthenticated ? children : <Navigate to="/login" />
+  const hasHydrated = useAuthStore((state) => state.hasHydrated)
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-500 font-mono text-xs uppercase tracking-widest">
+        Loading session...
+      </div>
+    )
+  }
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
-// Initialize auth session on app load
 function AuthInitializer() {
   const restoreSession = useAuthStore((state) => state.restoreSession)
 
@@ -31,8 +39,8 @@ createRoot(document.getElementById('root')).render(
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/room/:inviteCode" element={
           <ProtectedRoute>
             <RoomPage />

@@ -12,7 +12,7 @@ export default function SidebarManager({
   onSendMessage, 
   user 
 }) {
-  const { roomCode, hostId } = useRoomStore();
+  const { roomCode, hostId, currentRound } = useRoomStore();
   const chatEndRef = useRef(null);
   const isHost = hostId?.toString() === user?._id?.toString();
 
@@ -24,7 +24,7 @@ export default function SidebarManager({
     <>
       {/* 📋 PROBLEM PANEL */}
       <div className={`shrink-0 h-full transition-all duration-200 ${questionPanelOpen ? 'w-[380px]' : 'w-0 opacity-0 pointer-events-none overflow-hidden'}`}>
-        <QuestionPanel roomId={roomCode} isHost={isHost} roundNumber={1} />
+        <QuestionPanel roomId={roomCode} isHost={isHost} roundNumber={currentRound} />
       </div>
 
       {/* 💬 ROOM CHAT FEED */}

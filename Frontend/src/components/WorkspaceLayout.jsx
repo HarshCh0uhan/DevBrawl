@@ -17,9 +17,8 @@ export default function WorkspaceLayout({ viewMode, user}) {
   const shouldMountEditor = viewMode === 'editor' || (viewMode === 'split' && activePanel === 'editor');
 
   const onFinalSubmit = async (codePayload) => {
-    // 🚀 THE FIX: Pulling cleanly out of global Zustand activeQuestion fields!
     if (!activeQuestion?._id) {
-      alert("❌ Frontend Error: Could not resolve the active questionId from state store layers.");
+      alert("❌ No active question. The host may not have started a round yet.");
       return;
     }
 
@@ -31,8 +30,15 @@ export default function WorkspaceLayout({ viewMode, user}) {
         sourceCode: codePayload,
         languageId: judge0Languages[selectedLanguage]
       });
+      // Optional success feedback
+      alert("✅ Submission received. AI is scoring your code...");
     } catch (err) {
-      console.error("❌ Submission Engine Drop:", err.response?.data || err.message);
+      const serverMsg = err.response?.data?.message
+        || err.response?.data?.errors?.[0]
+        || err.message
+        || "Unknown submission error";
+      console.error("❌ Submission failed:", serverMsg);
+      alert(`Submission failed: ${serverMsg}`);
     } finally {
       setIsSubmitting(false);
     }

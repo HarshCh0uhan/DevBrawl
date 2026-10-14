@@ -7,19 +7,25 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
-  process.env.FRONTEND_URL, // e.g. https://devbrawl.vercel.app
-].filter(Boolean);
+  process.env.FRONTEND_URL,
+].filter(Boolean)
 
 app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+  origin: (origin, callback) => {
+    // Allow requests with no origin (Postman, curl)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    // Allow all Vercel preview deployments
+    if (origin.endsWith('.vercel.app')) return callback(null, true)
+    return callback(new Error(`CORS blocked: ${origin}`))
+  },
+  credentials: false,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
-
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' })
