@@ -21,14 +21,27 @@ export const useRoomStore = create((set) => ({
 
   // ── MUTATORS / ACTIONS ───────────────────────────────────────────────────
   // Initial Room Setup when joining
-  initRoomSession: (roomData) => set({
-    roomCode: roomData.inviteCode?.toUpperCase() || '',
-    hostId: roomData.hostId || null,
-    participants: roomData.participants || [],
-    totalPlayers: roomData.participants?.length || 0,
-    turnStatus: roomData.gameStatus || 'waiting',
-    currentRound: 1,
-  }),
+  // Also restores the live turn (who is coding, which turn) from the server's room
+  // document, so a refresh/reconnect mid-turn doesn't leave everyone read-only
+  // with no Submit button.
+  initRoomSession: (roomData) => {
+    const participants = roomData.participants || [];
+    const turnActive = roomData.gameStatus === 'turn_active' && roomData.activePlayerId;
+    const activePlayerId = turnActive ? String(roomData.activePlayerId) : null;
+    const activePlayer = participants.find((p) => String(p.userId) === activePlayerId);
+
+    set({
+      roomCode: roomData.inviteCode?.toUpperCase() || '',
+      hostId: roomData.hostId || null,
+      participants,
+      totalPlayers: participants.length,
+      turnStatus: roomData.gameStatus || 'waiting',
+      activePlayerId,
+      activeUsername: activePlayer?.username || '',
+      turnIndex: roomData.currentTurnIndex || 0,
+      currentRound: 1,
+    });
+  },
 
   // Dynamic Workspace Synchers
   setParticipants: (list) => set({ participants: list, totalPlayers: list.length }),

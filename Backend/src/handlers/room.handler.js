@@ -3,9 +3,18 @@
 import { createRoomInternal, joinRoomInternal } from "../controllers/room.controller.js";
 import { Room } from "../model/room.model.js";
 import { advanceTurn } from "../utils/socket.js";
+import { cancelPendingLeave, hasLiveSocket, removeUserFromRoom } from "../utils/presence.js";
+
+// The stored match summary can be large (all players' results); it is delivered
+// through the dedicated "match-summary-ready" event, not inside the room object.
+const toClientRoom = (room) => {
+  const obj = typeof room.toJSON === "function" ? room.toJSON() : { ...room };
+  delete obj.lastSummary;
+  return obj;
+};
 
 export const registerRoomHandlers = (io, socket) => {
-  
+
   socket.on("create-room", async (payload, callback) => {
     const data = typeof payload === "string" ? JSON.parse(payload) : payload;
     try {
@@ -30,7 +39,9 @@ export const registerRoomHandlers = (io, socket) => {
   socket.on("join-room", async (payload, callback) => {
     const data = typeof payload === "string" ? JSON.parse(payload) : payload;
     try {
-      const updatedRoom = await joinRoomInternal(payload, socket.user);
+      const updatedRoom = await joinRoomInternal(data, socket.user);
+      // Coming back (refresh / reconnect) cancels a pending delayed removal.
+      cancelPendingLeave(updatedRoom.inviteCode, socket.user._id);
       await socket.join(updatedRoom.inviteCode);
       socket.currentRoom = updatedRoom.inviteCode;
 
@@ -41,13 +52,41 @@ export const registerRoomHandlers = (io, socket) => {
         participants: updatedRoom.participants
       });
 
+      // Match already finished and this client missed the broadcast: resend it.
+      if (updatedRoom.gameStatus === "all_done" && updatedRoom.lastSummary) {
+        socket.emit("match-summary-ready", updatedRoom.lastSummary);
+      }
+
       if (typeof callback === "function") {
-        callback({ success: true, data: updatedRoom });
+        callback({ success: true, data: toClientRoom(updatedRoom) });
       }
     } catch (error) {
       if (typeof callback === "function") {
         callback({ success: false, error: error.message });
       }
+    }
+  });
+
+  // Explicit leave (Leave button / navigating away). Disconnects are handled
+  // separately with a grace period in utils/presence.js.
+  socket.on("leave-room", async (payload, callback) => {
+    try {
+      const data = typeof payload === "string" ? JSON.parse(payload) : payload;
+      const code = (data?.inviteCode || socket.currentRoom || "").toUpperCase();
+      if (!code) return callback?.({ success: false, error: "inviteCode is required" });
+
+      cancelPendingLeave(code, socket.user._id);
+      await socket.leave(code);
+      if (socket.currentRoom === code) socket.currentRoom = null;
+
+      // Another tab of the same user may still be in the room; keep the participant then.
+      if (!(await hasLiveSocket(io, code, socket.user._id))) {
+        await removeUserFromRoom(io, code, socket.user);
+      }
+      callback?.({ success: true });
+    } catch (error) {
+      console.error("❌ leave-room error:", error.message);
+      callback?.({ success: false, error: error.message });
     }
   });
 

@@ -3,7 +3,7 @@ import { socketAuthMiddleware } from "../middlewears/auth.socket.middlewear.js";
 import { Room } from "../model/room.model.js";
 import { Submission } from "../model/submission.model.js";
 import { setIoInstance } from "../services/aiScoringQueue.js";
-import { leaveRoomInternal } from "../controllers/room.controller.js";
+import { scheduleLeave } from "./presence.js";
 import { compileAndBroadcastLeaderboard } from "../services/leaderBoard.service.js";
 
 import { registerRoomHandlers } from "../handlers/room.handler.js";
@@ -111,24 +111,21 @@ export const initializeSocket = (httpServer) => {
   io.on("connection", (socket) => {
     console.log(`🔌 Authenticated Socket connected: ${socket.id} | User: ${socket.user.username}`);
 
+    // Needed by presence.js: RemoteSocket (io.in(room).fetchSockets()) only exposes socket.data.
+    socket.data.userId = socket.user._id.toString();
+
     // Register Split Handlers, passing central io and individual socket scopes
     registerRoomHandlers(io, socket);
     registerSyncHandlers(io, socket);
     registerQuestionHandlers(io, socket);
 
     // ── Disconnect ──────────────────────────────────────────────────────
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
       console.log(`❌ Socket disconnected: ${socket.id}`);
       if (!socket.currentRoom) return;
 
-      const room = await leaveRoomInternal(socket.currentRoom, socket.user._id);
-      if (!room) return;
-
-      io.to(socket.currentRoom).emit("user-left", {
-        userId: socket.user._id,
-        username: socket.user.username,
-        systemMessage: `${socket.user.username} has left the workspace.`
-      });
+      // Delayed: a refresh/reconnect re-joins within the grace period and cancels this.
+      scheduleLeave(io, socket.currentRoom, socket.user);
     });
   });
 

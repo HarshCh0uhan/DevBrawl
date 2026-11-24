@@ -34,15 +34,17 @@ const joinRoomInternal = async (payload, user) => {
 
     if (!room) throw new ApiError(404, "Room not found or deactivated");
 
-    if (room.participants.length >= room.maxParticipants) {
-        throw new ApiError(400, "Room is full");
-    }
-
+    // Check membership BEFORE capacity: someone already in a full room must be
+    // able to re-join (refresh / reconnect) instead of being told it is full.
     const isAlreadyInside = room.participants.some(
         (p) => p.userId.toString() === user._id.toString()
     );
 
     if (isAlreadyInside) return room;
+
+    if (room.participants.length >= room.maxParticipants) {
+        throw new ApiError(400, "Room is full");
+    }
 
     room.participants.push({
         userId: user._id,

@@ -21,6 +21,10 @@ const roomSchema = new mongoose.Schema({
   currentTurnIndex:  { type: Number, default: 0 },
   activePlayerId:    { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
+  // Last compiled match summary, kept so players who missed the broadcast
+  // (reconnect / refresh) get the score screen when they re-join.
+  lastSummary:       { type: mongoose.Schema.Types.Mixed, default: null },
+
 }, { timestamps: true });
 
 export const Room = mongoose.model("Room", roomSchema);

@@ -1,6 +1,23 @@
 import { generateText as groqGenerateText, isGroqAvailable } from "../utils/groq.js";
 import { generateText as openrouterGenerateText, isOpenRouterAvailable } from "../utils/openrouter.js";
 import { Submission } from "../model/submission.model.js";
+import { Room } from "../model/room.model.js";
+
+// Emits the summary to the room and stores a copy on the Room so late/reconnecting
+// players can still get it. sourceCode is dropped from the stored copy (the score
+// screen doesn't show it and it would bloat the room document).
+const publishSummary = async (io, roomId, summary) => {
+  io.to(roomId).emit("match-summary-ready", summary);
+  try {
+    const stored = {
+      ...summary,
+      leaderboard: summary.leaderboard.map(({ sourceCode, ...rest }) => rest),
+    };
+    await Room.updateOne({ inviteCode: roomId }, { $set: { lastSummary: stored } });
+  } catch (err) {
+    console.warn(`⚠️ Could not persist match summary for ${roomId}: ${err.message}`);
+  }
+};
 
 const generateCommentary = async (prompt) => {
   if (isGroqAvailable()) {
@@ -56,7 +73,7 @@ export const compileAndBroadcastLeaderboard = async (io, roomId) => {
     ]);
 
     if (leaderboard.length === 0) {
-      io.to(formattedRoomId).emit("match-summary-ready", {
+      await publishSummary(io, formattedRoomId, {
         leaderboard: [],
         feedback: "The arena closed silently. No submissions were logged.",
         winnerId: null,
@@ -89,7 +106,7 @@ Provide a short, punchy, 3-sentence tactical feedback report summarizing who had
     }
 
     // 3. Always emit regardless of whether AI succeeded or failed
-    io.to(formattedRoomId).emit("match-summary-ready", {
+    await publishSummary(io, formattedRoomId, {
       leaderboard,
       feedback: roomFeedback,
       winnerId: leaderboard[0]._id.toString(),

@@ -23,14 +23,23 @@ export const registerSyncHandlers = (io, socket) => {
   });
 
   socket.on("canvas-change", (data) => {
-    const roomId = data?.roomId;
-    const elements = data?.elements;
-
-    if (!roomId || !Array.isArray(elements) || elements.length === 0) return;
-
-    const snapshot = canvasSnapshots.get(roomId) || { elements: new Map(), timestamp: 0 };
-    for (const element of elements) {
-      if (element?.id) snapshot.elements.set(element.id, element);
+    // Maintain snapshot
+    const roomId = data.roomId;
+    if (roomId) {
+      const snapshot = canvasSnapshots.get(roomId) || { records: {}, timestamp: 0 };
+      if (data.added) Object.assign(snapshot.records, data.added);
+      if (data.updated) {
+        // tldraw sends updated as { id: [from, to] }. Store the NEW record ("to"),
+        // not the tuple, or snapshot resyncs hand arrays to editor.store.put and crash it.
+        Object.entries(data.updated).forEach(([id, change]) => {
+          snapshot.records[id] = Array.isArray(change) ? change[1] : change;
+        });
+      }
+      if (data.removed) {
+        Object.keys(data.removed).forEach((id) => delete snapshot.records[id]);
+      }
+      snapshot.timestamp = Date.now();
+      canvasSnapshots.set(roomId, snapshot);
     }
     snapshot.timestamp = Date.now();
     canvasSnapshots.set(roomId, snapshot);

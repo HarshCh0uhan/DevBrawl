@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../utils/socket';
 import { useAuthStore } from '../store/authStore';
 import { useRoomStore } from '../store/roomStore';
+import api from '../utils/axios';
 import ArenaLeaderboard from '../components/leaderBoard';
 
 import RoomHeader from '../components/RoomHeader';
@@ -27,20 +28,46 @@ export default function RoomPage() {
     const roomToken = inviteCode.toUpperCase();
     socket.roomId = roomToken;
 
-    socket.emit("join-room", { inviteCode: roomToken }, (res) => {
-      if (res?.success) {
-        store.initRoomSession(res.data);
-      } else {
-        navigate('/dashboard');
+    // The Submit button needs store.activeQuestion. The question panel fetches the
+    // question on its own, so without this a refreshed player would see the problem
+    // but get "No active question" when submitting.
+    const syncActiveQuestion = async () => {
+      try {
+        const round = useRoomStore.getState().currentRound;
+        const res = await api.get(`/questions/${roomToken}/${round}`);
+        if (res.data?.data) store.setActiveQuestion(res.data.data);
+      } catch {
+        // 404 = host hasn't started a round yet; nothing to sync.
       }
-    });
+    };
+
+    // Joining is idempotent on the server. It runs on mount AND on every socket
+    // (re)connect: a reconnected socket is a brand-new socket that is no longer in
+    // the room, so without this the player silently stops receiving every event.
+    const joinRoom = () => {
+      socket.emit("join-room", { inviteCode: roomToken }, (res) => {
+        if (res?.success) {
+          store.initRoomSession(res.data);
+          syncActiveQuestion();
+        } else {
+          navigate('/dashboard');
+        }
+      });
+    };
+
+    if (socket.connected) joinRoom();
+    socket.on("connect", joinRoom);
 
     socket.on("user-joined", (data) => {
       if (data.participants) store.setParticipants(data.participants);
     });
 
-    // 🚀 FIXED: Broken state closure updated to get fresh snapshot values
     socket.on("user-left", (data) => {
+      // Prefer the server's authoritative roster; fall back to filtering locally.
+      if (data.participants) {
+        store.setParticipants(data.participants);
+        return;
+      }
       const currentParticipants = useRoomStore.getState().participants;
       store.setParticipants(currentParticipants.filter(p => p.userId !== data.userId));
     });
@@ -125,6 +152,12 @@ export default function RoomPage() {
     });
 
     return () => {
+      // Tell the server (and everyone else) we left: Leave button, back button or
+      // any navigation away. A closed tab/refresh is covered by the server's
+      // disconnect grace period instead.
+      if (socket.connected) socket.emit("leave-room", { inviteCode: roomToken });
+
+      socket.off("connect", joinRoom);
       socket.off("user-joined");
       socket.off("user-left");
       socket.off("receive-message");
