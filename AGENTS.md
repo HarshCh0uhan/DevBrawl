@@ -10,6 +10,11 @@
 Build DevBrawl — a free, real-time collaborative coding interview platform.
 **Every decision must optimize for: FREE tier, simplicity, reliability.**
 
+This is a **local-only project**. There is no production deployment and no
+Oracle Cloud infrastructure. Code execution runs through **OneCompiler via
+RapidAPI** (free tier, hard cap of 1,000 requests/month). MongoDB is either
+MongoDB Atlas M0 or a native local install. No container runtime is required.
+
 ---
 
 ## 🔄 Git Workflow (MANDATORY)
@@ -76,26 +81,32 @@ git checkout main && git pull && git branch -d feature/descriptive-name
 ## 🏗️ Project Architecture
 
 ```
-Frontend (React + Vite)     Backend (Node.js + Express)
-├── Monaco Editor           ├── Socket.io (real-time)
-├── tldraw Canvas           ├── Piston API (code exec)
-├── Socket.io Client        ├── MongoDB (Mongoose)
-└── Zustand Store           ├── AI Services (Gemini/Groq/OpenRouter)
+Frontend (React + Vite)        Backend (Node.js + Express)
+├── Monaco Editor              ├── Socket.io (real-time)
+├── Excalidraw Canvas          ├── Mongoose (MongoDB Atlas/local)
+├── Socket.io Client           ├── OneCompiler via RapidAPI (code exec)
+└── Zustand Store              └── AI Services (Gemini/Groq/OpenRouter)
 ```
+
+Code execution is **OneCompiler via RapidAPI** only. There is no local
+container execution and no self-hosted execution engine. Every test case in a
+submission costs one RapidAPI request.
 
 ---
 
-## 💰 Free Tier Stack
+## 💰 Current Stack
 
 | Service | Tier | Purpose |
 |---------|------|---------|
-| Oracle Cloud | Always Free (4 ARM CPU, 24GB) | Host everything |
-| MongoDB Atlas | M0 (512MB) | Database |
+| MongoDB Atlas | M0 (512MB) or native local | Database |
+| OneCompiler (RapidAPI) | Free: 1,000 req/month (hard cap) | Code execution |
 | Gemini | 1,500 req/day | Primary AI |
 | Groq | 14,400 req/day | Fallback AI |
 | OpenRouter | Free (Nemotron) | Backup AI |
-| Piston | Self-hosted | Code execution |
 | LiveKit | 10K min/mo | Voice/Video |
+| Cloudinary | 25GB storage | Image uploads |
+| Node.js 20 LTS | Free | Backend runtime |
+| React + Vite | Free | Frontend |
 
 ---
 
@@ -105,9 +116,12 @@ Frontend (React + Vite)     Backend (Node.js + Express)
 |------|---------|
 | `Backend/src/services/aiQuestionGenerator.js` | AI question generation (3 providers) |
 | `Backend/src/services/aiScoringService.js` | AI code scoring (3 providers) |
-| `Backend/src/utils/openrouter.js` | OpenRouter client (Nemotron) |
+| `Backend/src/utils/oneCompilerExecutor.js` | Code execution via RapidAPI (LIVE) |
+| `Backend/src/controllers/codeWrapper.js` | Java/C++ boilerplate wrapper |
+| `Backend/src/controllers/code.controller.js` | Run Code endpoint |
+| `Backend/src/controllers/submission.controller.js` | Submit/judge endpoint |
 | `Backend/src/utils/groq.js` | Groq client (fallback models) |
-| `Backend/src/utils/pistonExecutor.js` | Code execution via Piston |
+| `Backend/src/utils/openrouter.js` | OpenRouter client (Nemotron) |
 | `Frontend/src/store/authStore.js` | JWT auth + auto-refresh |
 | `README.md` | Project docs |
 | `AGENTS.md` | This file |
@@ -117,19 +131,19 @@ Frontend (React + Vite)     Backend (Node.js + Express)
 ## 🧪 Testing Commands
 
 ```bash
-# Backend test
-cd Backend && node -e "
-require('dotenv').config();
-process.env.AI_PROVIDER='openrouter';
-import('./src/services/aiQuestionGenerator.js').then(m => 
-  m.generateQuestion('arrays', 'easy').then(console.log).catch(console.error)
-);"
+# OneCompiler live executor regression test
+cd Backend && npm run test:executor
 
 # Frontend build
 cd Frontend && npm run build
 
-# Full stack
-docker compose up -d
+# Backend AI smoke test
+cd Backend && node -e "
+require('dotenv').config();
+process.env.AI_PROVIDER='openrouter';
+import('./src/services/aiQuestionGenerator.js').then(m =>
+  m.generateQuestion('arrays', 'easy').then(console.log).catch(console.error)
+);"
 ```
 
 ---
@@ -138,10 +152,12 @@ docker compose up -d
 
 | Pitfall | Solution |
 |---------|----------|
-| Server runs old code | `taskkill /F /PID $(netstat -ano \| findstr :8000 \| awk '{print $5}')` |
-| AI returns empty | Model doesn't support JSON mode → fallback to non-JSON |
-| Missing topic/difficulty | Add to `normalizeQuestion` return object |
+| RAPIDAPI quota exhausted (1,000/mo) | Free tier is hard-capped — switch to paid tier or reduce test cases per submission |
+| RAPIDAPI_KEY / RAPIDAPI_HOST missing | Check `Backend/.env`; the health endpoint will report degraded |
+| OneCompiler returns empty | `.env` keys stale; re-issue at https://rapidapi.com/onecompiler |
 | Mongo validation error | Check required fields in returned object |
+| Server runs old code | `taskkill /F /PID <pid>` then `npm run dev` |
+| AI returns empty | Model doesn't support JSON mode → fallback to non-JSON |
 
 ---
 
@@ -168,5 +184,5 @@ Example: `fix: OpenRouter topic normalization - pass topic/difficulty as fallbac
 
 ---
 
-*Last updated: 2024-10-08*
+*Last updated: 2026-11-25*
 *Workflow established after repeated hallucination failures - learn from history.*
