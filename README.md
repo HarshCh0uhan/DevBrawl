@@ -1,15 +1,21 @@
 # DevBrawl — Real-time Collaborative Coding Interview Platform
 
-> **Built for free. Runs for free. Scales on Oracle Cloud Always Free.**
+> **Built for free. Runs locally. No production deployment required.**
 
 ## 🎯 What is DevBrawl?
 
 A real-time multiplayer coding interview platform where developers:
 - Join rooms and take turns solving AI-generated challenges
 - Code collaboratively with Monaco Editor (VS Code in browser)
-- Whiteboard together with Excalidraw canvas
+- Whiteboard together with an Excalidraw canvas
 - Get instant feedback via automated tests + AI code review
 - Compete on leaderboards with gamified scoring
+
+This is a **local-only project**. There is no production deployment and no
+cloud VM infrastructure. Code execution runs through **OneCompiler via
+RapidAPI** (free tier, hard cap of 1,000 requests/month). MongoDB is either
+MongoDB Atlas M0 or a native local install. **No container runtime is
+required.**
 
 ---
 
@@ -19,232 +25,120 @@ A real-time multiplayer coding interview platform where developers:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              CLIENT (React + Vite)                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │
-│  │ Monaco Edit │  │  Excalidraw │  │  Socket.io  │  │  LiveKit/Daily   │   │
-│  │    or       │  │  Canvas     │  │  Client     │  │  Voice/Video     │   │
+│  │ Monaco Edit │  │  Excalidraw │  │  Socket.io  │  │     LiveKit      │   │
+│  │    or       │  │  Canvas     │  │  Client     │  │   Voice/Video    │   │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └──────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
-                            HTTPS / WSS (Socket.io)
+                            HTTP / WSS (Socket.io)
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        ORACLE CLOUD ALWAYS FREE VM                           │
+│                         LOCAL BACKEND (Node.js)                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │
-│  │   Nginx     │  │  Backend    │  │  MongoDB    │  │     Piston       │   │
-│  │  (SSL/TLS)  │◄─┤  (Node.js)  │◄─┤  (7.0)      │  │  Code Execution  │   │
-│  └─────────────┘  └──────┬──────┘  └─────────────┘  └──────────────────┘   │
-│                         │                                                    │
-│              ┌──────────┴──────────┐                                        │
-│              ▼                     ▼                                        │
-│      ┌─────────────┐         ┌─────────────┐                               │
-│      │   Gemini    │         │  LiveKit    │                               │
-│      │   AI API    │         │  Cloud      │                               │
-│      │  (Free)     │         │  (Free)     │                               │
-│      └─────────────┘         └─────────────┘                               │
+│  │   Express   │  │  Socket.io  │  │  MongoDB    │  │   AI Providers   │   │
+│  │   REST API  │  │   Server    │  │ Atlas/local │  │ Gemini/Groq/OR   │   │
+│  └──────┬──────┘  └─────────────┘  └─────────────┘  └──────────────────┘   │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │            OneCompiler via RapidAPI (HTTPS, 1,000 req/mo)             │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 💰 **100% Free Stack**
+## 💰 Current Stack
 
 | Service | Free Tier | Purpose |
 |---------|-----------|---------|
-| **Oracle Cloud** | **Always Free**: 4 ARM CPUs, 24GB RAM, 200GB storage | Host everything |
-| **MongoDB Atlas M0** | 512MB (or self-host on Oracle) | Database |
+| **MongoDB Atlas M0** | 512MB (or native local install) | Database |
+| **OneCompiler via RapidAPI** | **1,000 requests/month, hard cap** | Code execution |
 | **Google Gemini** | 1,500 req/day | AI questions + code scoring |
 | **Groq** | 14,400 req/day | Fallback AI (ultra-fast) |
-| **Piston** | Self-hosted (open source) | Code execution (JS, Python, Java, C++, Go, Rust) |
+| **OpenRouter** | Free (Nemotron) | Backup AI |
 | **LiveKit Cloud** | 10K participant min/mo | Voice/Video calls |
-| **Daily.co** | 10K min/mo | Video call alternative |
 | **Cloudinary** | 25GB storage + bandwidth | Image uploads |
-| **Vercel/Netlify** | Unlimited personal | Frontend hosting (optional) |
-| **Let's Encrypt** | Free SSL | HTTPS certificates |
+| **Node.js 20 LTS** | Free | Backend runtime |
+| **React + Vite** | Free | Frontend |
+
+> **Quota note:** every test case in a submission costs one OneCompiler API
+> call. A submission with 5 test cases costs 5 calls. At 1,000 calls/month,
+> that is roughly 200 submissions/month.
 
 ---
 
 ## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
-- **Docker Desktop** (or Docker Engine + Compose)
-- **Node.js 20+** (for non-Docker development)
-- **Git**
+- **Node.js 20+** and **npm**
+- **MongoDB Atlas M0** connection string (or a native local MongoDB)
+- **RapidAPI OneCompiler** subscription — free tier at
+  [rapidapi.com/onecompiler](https://rapidapi.com/onecompiler)
+- Optional: Gemini, Groq, OpenRouter, LiveKit, Cloudinary keys
 
-### One-Command Start
+### 1. Backend
+
 ```bash
-# Clone and start everything
-git clone <your-repo> devbrawl
-cd devbrawl
-docker compose up -d
-
-# Check status
-docker compose ps
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8000
-# Piston API: http://localhost:2000
+cd Backend
+npm install
+cp .env.example .env    # Windows: copy .env.example .env
+# Fill in RAPIDAPI_KEY, RAPIDAPI_HOST, MONGODB_URI, ACCESS_TOKEN_SECRET, AI keys
+npm run dev
 ```
 
-### Manual Development (without Docker)
+Backend runs at `http://localhost:8000`.
+
+### 2. Frontend
+
 ```bash
-# Terminal 1: MongoDB (if not using Docker)
-mongod --dbpath ./data/db
-
-# Terminal 2: Piston (code execution)
-docker run -d -p 2000:2000 ghcr.io/engineer-man/piston:latest
-
-# Terminal 3: Backend
-cd Backend
-cp .env.example .env  # Fill in your keys
-npm install
-npm run dev
-
-# Terminal 4: Frontend
 cd Frontend
 npm install
 npm run dev
 ```
 
----
+Frontend runs at `http://localhost:5173`.
 
-## ☁️ Oracle Cloud Always Free Deployment
+### 3. Verify the live executor
 
-### 1. Create Oracle Cloud Account
-- Sign up at [cloud.oracle.com](https://cloud.oracle.com) (requires credit card for verification, **no charge**)
-- Choose **Always Free** tier
-
-### 2. Create VM Instance
-```
-Shape: VM.Standard.A1.Flex (ARM)
-OCPUs: 4 (max for Always Free)
-Memory: 24 GB (max for Always Free)
-OS: Ubuntu 22.04 or 24.04 (ARM)
-Boot Volume: 200 GB (max for Always Free)
-```
-
-### 3. Configure Networking
-- **VCN**: Create new or use default
-- **Subnet**: Public subnet
-- **Security List/NSG**: Allow ports **22 (SSH), 80 (HTTP), 443 (HTTPS)**
-- **Public IP**: Assign ephemeral public IP
-
-### 4. SSH & Run Setup Script
 ```bash
-# SSH into your instance
-ssh ubuntu@<your-vm-ip>
-
-# Run the automated setup script
-curl -fsSL https://raw.githubusercontent.com/<your-repo>/main/deploy/oracle-cloud-setup.sh | bash
-
-# Or copy the script and run manually
+cd Backend
+npm run test:executor
 ```
 
-### 5. Deploy Your Application
-```bash
-# Clone your repo
-cd /var/www/devbrawl
-git clone https://github.com/<your-username>/devbrawl.git .
+This calls OneCompiler for JavaScript and Python and asserts the output is `2`.
+It consumes a small number of API requests.
 
-# Configure environment
-cp Backend/.env.example Backend/.env
-# Edit .env with your API keys
-
-# Deploy
-./deploy.sh
-```
-
-### 6. Setup SSL (HTTPS)
-```bash
-# Replace with your domain
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-
-# Auto-renewal is configured via certbot container
-```
-
-### 7. Configure DNS
-```
-A Record: @     → <your-vm-public-ip>
-A Record: www   → <your-vm-public-ip>
-```
+> **No container runtime is required. Code execution happens over HTTPS through
+> RapidAPI. There is no self-hosted execution engine.**
 
 ---
 
-## 🔑 Required API Keys (All Free)
+## 🔑 Environment Variables
 
-### Google Gemini (Primary AI)
-1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-2. Create API key
-3. Add to `.env`: `GEMINI_API_KEY=your-key`
+Copy `Backend/.env.example` to `Backend/.env` and fill in the values.
 
-### Groq (Fallback AI - Optional but Recommended)
-1. Go to [console.groq.com/keys](https://console.groq.com/keys)
-2. Create API key
-3. Add to `.env`: `GROQ_API_KEY=your-key`
-
-### AI Provider Configuration
-Control which AI provider is used via `AI_PROVIDER` in `.env`:
-
-| Value | Behavior |
-|-------|----------|
-| `gemini` | Use only Google Gemini |
-| `groq` | Use only Groq (Llama 3.1 70B) |
-| `auto` | **Default** - Try Gemini first, fallback to Groq on failure |
-
-```bash
-# .env example
-AI_PROVIDER=auto  # Recommended: best of both worlds
-# AI_PROVIDER=groq  # Use only Groq (faster, higher rate limits)
-# AI_PROVIDER=gemini  # Use only Gemini
-```
-
-**Why use both?**
-- **Gemini**: Better structured JSON output, generous free tier (1,500/day)
-- **Groq**: Ultra-fast inference (~300 tokens/sec), massive free tier (14,400/day)
-- **Auto mode**: Best reliability - if one fails, the other takes over seamlessly
-
-### MongoDB Atlas (or self-host)
-1. Go to [cloud.mongodb.com](https://cloud.mongodb.com)
-2. Create M0 Free cluster
-3. Get connection string
-4. Add to `.env`: `MONGODB_URI=mongodb+srv://...`
-
-### Cloudinary (Images)
-1. Go to [cloudinary.com/console](https://cloudinary.com/console)
-2. Get Cloud Name, API Key, API Secret
-3. Add to `.env`
-
-### LiveKit Cloud (Voice/Video)
-1. Go to [cloud.livekit.io](https://cloud.livekit.io)
-2. Create project
-3. Get API Key, Secret, URL
-4. Add to `.env`
-
-### Daily.co (Alternative Video)
-1. Go to [dashboard.daily.co](https://dashboard.daily.co)
-2. Create API key
-3. Add to `.env`: `DAILY_API_KEY=your-key`
-
----
-
-## 🛠️ Development Tools (Free)
-
-### IDEs
-| Tool | Cost | Best For |
-|------|------|----------|
-| **VS Code** | Free | Primary editor |
-| **Windsurf (Codeium)** | Free | **AI-powered VS Code fork, unlimited completions** |
-| **Cursor** | Free tier (2K completions/mo) | AI-first editor |
-| **GitHub Codespaces** | 60 hrs/mo | Cloud dev environment |
-| **Zed** | Free | Fast, native, collaborative |
-
-### Recommended: VS Code + Windsurf Extension
-```bash
-# Install Windsurf (free AI completions)
-# Or use Continue.dev extension with Groq/Ollama
-```
-
-### AI Coding Assistants (Free)
-- **Groq + Continue.dev** — Ultra-fast, free
-- **Ollama (local)** — Run Llama 3.1, CodeLlama locally
-- **GitHub Copilot** — Free for students/educators/OSS maintainers
+| Variable | Required | Purpose |
+|---|---|---|
+| `PORT` | No (default 8000) | Backend HTTP port |
+| `NODE_ENV` | No | `development` or `production` |
+| `MONGODB_URI` | **Yes** | MongoDB Atlas or native connection string |
+| `DB_NAME` | No (default `devbrawl`) | Database name |
+| `ACCESS_TOKEN_SECRET` | **Yes** | JWT signing secret (64+ chars) |
+| `ACCESS_TOKEN_EXPIRY` | No (default `7d`) | JWT lifetime |
+| `RAPIDAPI_KEY` | **Yes** | OneCompiler RapidAPI key |
+| `RAPIDAPI_HOST` | **Yes** | `onecompiler-apis.p.rapidapi.com` |
+| `GEMINI_API_KEY` | Recommended | Gemini AI |
+| `GROQ_API_KEY` | Recommended | Groq AI fallback |
+| `OPENROUTER_API_KEY` | Optional | OpenRouter AI fallback |
+| `AI_PROVIDER` | No (default `auto`) | `gemini`, `groq`, `openrouter`, or `auto` |
+| `CLOUDINARY_CLOUD_NAME` | Optional | Avatar uploads |
+| `CLOUDINARY_API_KEY` | Optional | Avatar uploads |
+| `CLOUDINARY_API_SECRET` | Optional | Avatar uploads |
+| `LIVEKIT_API_KEY` | Optional | Voice/Video |
+| `LIVEKIT_API_SECRET` | Optional | Voice/Video |
+| `LIVEKIT_URL` | Optional | Voice/Video WebSocket URL |
+| `FRONTEND_URL` | **Yes** | CORS origin, e.g. `http://localhost:5173` |
 
 ---
 
@@ -254,17 +148,16 @@ AI_PROVIDER=auto  # Recommended: best of both worlds
 DevBrawl/
 ├── Backend/                    # Node.js + Express + Socket.io
 │   ├── src/
-│   │   ├── controllers/        # Route handlers
+│   │   ├── controllers/        # Route handlers (code, submission, question, user)
 │   │   ├── handlers/           # Socket.io event handlers
 │   │   ├── middlewears/        # Auth, error, multer
-│   │   ├── models/             # Mongoose schemas
+│   │   ├── model/              # Mongoose schemas
 │   │   ├── routes/             # API routes
 │   │   ├── services/           # Business logic (AI, scoring, leaderboard)
-│   │   ├── utils/              # Helpers (Piston, socket, auth)
-│   │   ├── db/                 # MongoDB connection
-│   │   └── index.js            # Entry point
-│   ├── Dockerfile              # Production
-│   ├── Dockerfile.dev          # Development
+│   │   ├── utils/              # Helpers (OneCompiler, socket, auth, AI clients)
+│   │   └── db/                 # MongoDB connection
+│   ├── test-onecompiler.js     # Live executor regression test
+│   ├── index.js                # Entry point
 │   └── package.json
 ├── Frontend/                   # React 19 + Vite + Tailwind
 │   ├── src/
@@ -273,14 +166,8 @@ DevBrawl/
 │   │   ├── store/              # Zustand state
 │   │   ├── utils/              # Socket, axios, Excalidraw canvas
 │   │   └── main.jsx
-│   ├── Dockerfile              # Production (nginx)
-│   ├── Dockerfile.dev          # Development
-│   ├── nginx.conf              # Nginx config
 │   └── package.json
-├── deploy/                     # Deployment scripts
-│   └── oracle-cloud-setup.sh   # Oracle Cloud automation
-├── docker-compose.yml          # Local dev (with Piston)
-├── docker-compose.prod.yml     # Production (Oracle Cloud)
+├── AGENTS.md                   # AI assistant workflow rules
 └── README.md
 ```
 
@@ -288,23 +175,24 @@ DevBrawl/
 
 ## 🔧 Key Features Implementation
 
-### 1. Code Execution (Piston API)
+### 1. Code Execution (OneCompiler via RapidAPI)
 ```javascript
-// Backend/src/utils/pistonExecutor.js
-// Supports: JS, Python, Java, C++, Go, Rust + 20 more
-// Rate limited, concurrent request queue
+// Backend/src/utils/oneCompilerExecutor.js
+// Supports: JavaScript, Python, Java, C++, Go, Rust
+// Per-user rate limiting (10 requests/min), 100KB source cap
+// Every test case costs one RapidAPI request
 ```
 
 ### 2. AI Question Generation
 ```javascript
 // Backend/src/services/aiQuestionGenerator.js
-// Uses Gemini 2.5 Flash with structured JSON output
+// Uses Gemini/Groq/OpenRouter with structured JSON output
 // Generates: title, prompt, constraints, test cases (2 visible, 3 hidden)
 ```
 
 ### 3. Two-Phase Scoring
 ```javascript
-// Phase 1: Instant (test execution)
+// Phase 1: Instant (test execution via OneCompiler)
 // Phase 2: Async AI review (code quality + approach)
 // Backend/src/services/aiScoringService.js + aiScoringQueue.js
 ```
@@ -315,8 +203,6 @@ DevBrawl/
 // Backend/src/handlers/ + Backend/src/utils/socket.js
 // Canvas: Excalidraw (MIT) with element-level sync through the existing Socket.IO room.
 // Frontend/src/utils/ExcalidrawCanvas.jsx sends only changed elements + tombstones.
-// Snapshot requests on mount/reconnect restore the board; tldraw was removed because
-// its SDK license no longer permits production use without a paid/hobby license key.
 ```
 
 ### 5. Turn-Based Gameplay
@@ -325,66 +211,77 @@ DevBrawl/
 // All turns complete → AI scoring → leaderboard compilation
 ```
 
-### 6. Flexible Avatar System (NEW)
+### 6. Flexible Avatar System
 ```javascript
-// Registration: Optional avatar upload OR choose from 12 emoji/default avatars
-// Backend: Accepts avatarSelection field for default avatars (no Cloudinary needed)
+// Registration: optional avatar upload OR choose from 12 emoji/default avatars
+// Backend: accepts avatarSelection for default avatars (no Cloudinary needed)
 // Frontend: AvatarSelector component with emoji + personalized initials options
-// Files: Frontend/src/components/AvatarSelector.jsx, Registration.jsx
 ```
 
-### 7. Dual AI Provider Support (NEW)
+### 7. Multi-Provider AI Support
 ```javascript
-// Both Gemini and Groq supported for question generation + code scoring
-// Configurable via AI_PROVIDER env: 'gemini' | 'groq' | 'auto' (fallback)
-// Files: Backend/src/utils/groq.js, aiScoringService.js, aiQuestionGenerator.js
-// Gemini: 1,500 req/day free | Groq: 14,400 req/day free (Llama 3.1 70B)
+// Gemini, Groq, and OpenRouter supported for question generation + scoring
+// Configurable via AI_PROVIDER env: 'gemini' | 'groq' | 'openrouter' | 'auto'
+// Files: Backend/src/utils/groq.js, openrouter.js, aiScoringService.js
 ```
 
-### 8. JWT Token Auto-Refresh (NEW)
+### 8. JWT Token Auto-Refresh
 ```javascript
 // Automatic token refresh before socket connection
 // Stores refresh token, checks expiry on app init, refreshes if needed
 // Files: Frontend/src/store/authStore.js, Backend/src/routes/user.routes.js
-// Endpoint: POST /api/v1/users/refresh-token
 ```
+
+---
+
+## 🔌 API Endpoints
+
+All `/api/v1/*` routes except health/login/register require a Bearer JWT.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/` | Server health (`{ status: "ok" }`) |
+| `POST` | `/api/v1/users/register` | Register (multipart avatar optional) |
+| `POST` | `/api/v1/users/login` | Login, returns JWT |
+| `GET` | `/api/v1/users/me` | Current user (auth) |
+| `GET` | `/api/v1/users/voice-token?roomName=...` | LiveKit token (auth) |
+| `POST` | `/api/v1/compiler/run-code` | Run code without test cases (auth) |
+| `GET` | `/api/v1/compiler/health` | OneCompiler configuration health |
+| `POST` | `/api/v1/submissions/submit` | Submit against test cases (auth) |
+| `POST` | `/api/v1/questions/generate` | Generate a round question (auth) |
+| `GET` | `/api/v1/questions/:roomId/:roundNumber` | Fetch an existing question (auth) |
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Backend tests
-cd Backend && npm test
+# OneCompiler live executor regression test (consumes API quota)
+cd Backend && npm run test:executor
 
-# Frontend tests
-cd Frontend && npm test
+# Frontend production build
+cd Frontend && npm run build
 
-# E2E (Playwright)
-npx playwright test
+# Frontend lint
+cd Frontend && npm run lint
 ```
+
+The Backend has no `npm test` script. Use `npm run test:executor` for the live
+path and the AI smoke command in `AGENTS.md` for the AI providers.
 
 ---
 
-## 📊 Monitoring & Maintenance
+## 🩺 Troubleshooting
 
-```bash
-# Health check
-curl https://your-domain.com/health
-
-# Monitor resources
-/var/www/devbrawl/monitor.sh
-
-# View logs
-sudo journalctl -u devbrawl-backend -f
-sudo docker logs devbrawl-piston -f
-
-# Backup MongoDB
-mongodump --uri="mongodb://localhost:27017/devbrawl" --out=/backup/$(date +%F)
-
-# Update deployment
-cd /var/www/devbrawl && ./deploy.sh
-```
+| Problem | Cause / Fix |
+|---|---|
+| `RAPIDAPI_KEY / RAPIDAPI_HOST not configured` | `Backend/.env` is missing keys. Add both from RapidAPI. |
+| OneCompiler API error (4xx) | Key invalid or monthly quota exhausted. Re-issue the key or wait for reset. |
+| `compiler/health` shows `degraded` | `RAPIDAPI_KEY` or `RAPIDAPI_HOST` is unset in the running process. |
+| OneCompiler returns empty output | Stale keys or unsupported language ID. Re-check `.env` and the language map. |
+| MongoDB connection fails | `MONGODB_URI` is wrong, or the Atlas IP allowlist does not include your machine. |
+| Frontend cannot reach backend | Check `FRONTEND_URL` and that the backend is running on port 8000. |
+| CORS blocked | `FRONTEND_URL` must match the browser origin exactly (`http://localhost:5173`). |
 
 ---
 
@@ -394,7 +291,9 @@ cd /var/www/devbrawl && ./deploy.sh
 2. Create feature branch: `git checkout -b feature/amazing-feature`
 3. Commit changes: `git commit -m 'Add amazing feature'`
 4. Push branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
+5. Open a Pull Request
+
+Follow the git workflow and agent rules in `AGENTS.md`.
 
 ---
 
@@ -404,75 +303,17 @@ MIT License — free for personal and commercial use.
 
 ---
 
-## 🛠️ Development Workflow (MANDATORY)
-
-**All contributors must follow this workflow for every task:**
-
-### 🔄 Git Workflow
-```bash
-# 1. Create feature branch from main
-git checkout main && git pull origin main
-git checkout -b feature/descriptive-name
-
-# 2. Implement changes
-# ... code changes ...
-
-# 3. Update documentation (README.md, AGENTS.md if workflow changes)
-
-# 4. Test locally
-# ... run tests, verify manually ...
-
-# 5. Commit & push
-git add .
-git commit -m "feat: descriptive message"
-git push origin feature/descriptive-name
-
-# 6. Create PR via GitHub CLI
-gh pr create --title "feat: descriptive title" --body "## Changes\n- ..."
-
-# 7. Merge after review
-gh pr merge --merge --delete-branch
-
-# 8. Clean up local
-git checkout main && git pull && git branch -d feature/descriptive-name
-```
-
-### 🧠 Agent Rules (MANDATORY for AI Assistants)
-
-**Before ANY code change, the agent MUST:**
-
-| Step | Rule | Why |
-|------|------|-----|
-| 1 | **Read actual current code first** | Don't assume - verify what exists |
-| 2 | **Check if fix already exists** | Don't add code that's already there |
-| 3 | **Verify with simple test** | Prove it works before claiming fixed |
-| 4 | **Restart server after changes** | Code changes need fresh process |
-
-**Violation = wasted time and hallucinated fixes.**
-
----
-
 ## 🙏 Acknowledgments
 
-- **Piston** — Open source code execution engine
-- **Monaco Editor** — VS Code editor in browser
-- **Excalidraw** — MIT licensed infinite canvas library
-- **tldraw** — Replaced due to production license restrictions
-- **LiveKit** — WebRTC infrastructure
+- **OneCompiler / RapidAPI** — Code execution API
+- **Monaco Editor** — VS Code editor in the browser
+- **Excalidraw** — MIT-licensed infinite canvas
+- **LiveKit** — WebRTC voice/video infrastructure
 - **Google Gemini** — Generous free AI tier
-- **Oracle Cloud** — Incredible Always Free tier
-
----
-
-## 💡 Pro Tips for Free Tier Optimization
-
-1. **Use ARM images** — All our Docker images support ARM64 natively
-2. **Enable swap** — `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`
-3. **Log rotation** — Configured via logrotate (prevents disk fill)
-4. **Piston warming** — Pre-pull runtimes: `curl -X POST http://localhost:2000/api/v2/piston/runtimes`
-5. **MongoDB indexes** — Already defined in models for performance
-6. **Nginx caching** — Static assets cached for 1 year
-7. **Rate limiting** — Protects against abuse on free tier
+- **Groq** — Ultra-fast free AI inference
+- **OpenRouter** — Free Nemotron fallback
+- **Cloudinary** — Free image storage
+- **MongoDB** — Atlas M0 free database
 
 ---
 
