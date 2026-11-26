@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { socket } from '../utils/socket'
 import api from '../utils/axios'
+import { TOPICS } from '../constants/topics'
 
 // ─── Difficulty badge color mapping ─────────────────────────────────────────
 const DIFFICULTY_STYLES = {
@@ -9,7 +10,6 @@ const DIFFICULTY_STYLES = {
   hard: 'bg-red-500/10 text-red-400 border-red-500/30',
 }
 
-const TOPICS = ["Arrays", "JavaScript", "Logic Puzzles", "Algorithms", "Data Structures", "Strings"]
 const DIFFICULTIES = ["easy", "medium", "hard"]
 
 export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {

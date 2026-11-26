@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
-import { socket } from './socket';
-import { collectChanges, elementKey, mergeElements, toMap } from './canvasSync';
+import { socket } from '../utils/socket';
+import { collectChanges, elementKey, mergeElements, toMap } from '../utils/canvasSync';
 
 const SYNC_DEBOUNCE_MS = 120;
 

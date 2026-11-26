@@ -1,8 +1,9 @@
 import{ useState } from 'react';
 import { useRoomStore } from '../store/roomStore';
-import CollaborativeCanvas from '../utils/ExcalidrawCanvas';
+import CollaborativeCanvas from './ExcalidrawCanvas';
 import MonacoEditor from './MonacoEditor';
 import api from '../utils/axios';
+import { JUDGE0_LANGUAGES } from '../constants/languages';
 
 export default function WorkspaceLayout({ viewMode, user}) {
   const [activePanel, setActivePanel] = useState('canvas');
@@ -11,8 +12,6 @@ export default function WorkspaceLayout({ viewMode, user}) {
 
   const { roomCode, activeQuestion, activePlayerId, turnStatus } = useRoomStore();
   const isMyTurn = activePlayerId === user?._id?.toString();
-  const judge0Languages = { javascript: 63, python: 71, cpp: 54, java: 62, go: 60, rust: 73 };
-
   const shouldMountCanvas = viewMode === 'canvas' || (viewMode === 'split' && activePanel === 'canvas');
   const shouldMountEditor = viewMode === 'editor' || (viewMode === 'split' && activePanel === 'editor');
 
@@ -28,7 +27,7 @@ export default function WorkspaceLayout({ viewMode, user}) {
         roomId: roomCode,
         questionId: activeQuestion._id,
         sourceCode: codePayload,
-        languageId: judge0Languages[selectedLanguage]
+        languageId: JUDGE0_LANGUAGES[selectedLanguage]
       });
       // Optional success feedback
       alert("✅ Submission received. AI is scoring your code...");
@@ -109,7 +108,7 @@ export default function WorkspaceLayout({ viewMode, user}) {
               <MonacoEditor
                 roomId={roomCode}
                 language={selectedLanguage}
-                languageId={judge0Languages[selectedLanguage]}
+                languageId={JUDGE0_LANGUAGES[selectedLanguage]}
                 readOnly={turnStatus === 'turn_active' && !isMyTurn}
                 isMyTurn={isMyTurn}
                 turnStatus={turnStatus}
