@@ -101,7 +101,7 @@ export const initializeSocket = (httpServer) => {
         if (origin.endsWith('.vercel.app')) return callback(null, true)
         return callback(new Error(`Socket CORS blocked: ${origin}`))
       },
-      credentials: false,
+      credentials: true,
     }
   });
 

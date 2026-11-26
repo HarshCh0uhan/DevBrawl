@@ -125,7 +125,7 @@ Copy `Backend/.env.example` to `Backend/.env` and fill in the values.
 | `MONGODB_URI` | **Yes** | MongoDB Atlas or native connection string |
 | `DB_NAME` | No (default `devbrawl`) | Database name |
 | `ACCESS_TOKEN_SECRET` | **Yes** | JWT signing secret (64+ chars) |
-| `ACCESS_TOKEN_EXPIRY` | No (default `7d`) | JWT lifetime |
+| `ACCESS_TOKEN_EXPIRY` | No (default `15m`) | JWT lifetime |
 | `RAPIDAPI_KEY` | **Yes** | OneCompiler RapidAPI key |
 | `RAPIDAPI_HOST` | **Yes** | `onecompiler-apis.p.rapidapi.com` |
 | `GEMINI_API_KEY` | Recommended | Gemini AI |
@@ -229,16 +229,18 @@ DevBrawl/
 
 ### 8. JWT Token Auto-Refresh
 ```javascript
-// Automatic token refresh before socket connection
-// Stores refresh token, checks expiry on app init, refreshes if needed
-// Files: Frontend/src/store/authStore.js, Backend/src/routes/user.routes.js
+// Access tokens live in Zustand memory; only the user profile is persisted.
+// An HttpOnly refresh cookie restores sessions and rotates on refresh.
+// Axios serializes concurrent 401 refreshes and retries queued requests.
+// Files: Frontend/src/store/authStore.js, Frontend/src/utils/axios.js
 ```
 
 ---
 
 ## 🔌 API Endpoints
 
-All `/api/v1/*` routes except health/login/register require a Bearer JWT.
+Protected `/api/v1/*` routes require a Bearer access token. Auth login,
+refresh, logout, and registration endpoints are cookie/session entry points.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -246,6 +248,10 @@ All `/api/v1/*` routes except health/login/register require a Bearer JWT.
 | `POST` | `/api/v1/users/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/users/login` | Login, returns JWT |
 | `GET` | `/api/v1/users/me` | Current user (auth) |
+| `POST` | `/api/v1/auth/login` | Login and set HttpOnly refresh cookie |
+| `POST` | `/api/v1/auth/refresh` | Rotate refresh cookie and return access token |
+| `POST` | `/api/v1/auth/logout` | Revoke refresh session |
+| `GET` | `/api/v1/auth/me` | Current user (auth) |
 | `GET` | `/api/v1/users/voice-token?roomName=...` | LiveKit token (auth) |
 | `POST` | `/api/v1/compiler/run-code` | Run code without test cases (auth) |
 | `GET` | `/api/v1/compiler/health` | OneCompiler configuration health |
