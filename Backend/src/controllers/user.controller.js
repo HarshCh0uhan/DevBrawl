@@ -3,13 +3,11 @@ import { ApiError } from "../utils/apiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
+import { validateLogin, validateRegister } from "../validators/auth.validators.js";
 
 const registerUser = asyncHandler(async (req, res) => {
+    validateRegister(req.body);
     const { fullName, email, username, password, phoneNumber, avatarSelection } = req.body;
-
-    if ([fullName, email, username, password, phoneNumber].some((field) => !field || field.trim() === "")) {
-        throw new ApiError(400, "All common fields are required");
-    }
 
     const existedUser = await User.findOne({ $or: [{ username }, { email }] });
     if (existedUser) {
@@ -42,14 +40,8 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
+    validateLogin(req.body);
     const { email, username, password } = req.body;
-
-    if (!email && !username) {
-        throw new ApiError(400, "Email or username is required");
-    }
-    if (!password) {
-        throw new ApiError(400, "Password is required");
-    }
 
     const user = await User.findOne({ $or: [{ username }, { email }] });
     if (!user) {
