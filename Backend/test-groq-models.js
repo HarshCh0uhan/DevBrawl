@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Test script to check which Groq models are available for your API key
 
-import 'dotenv/config';
+import { env } from './src/config/env.js';
 import { Groq } from 'groq-sdk';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: env.groqApiKey });
 
 async function testModels() {
   console.log('🔍 Testing Groq API key and available models...\n');
-  console.log('API Key:', process.env.GROQ_API_KEY?.startsWith('gsk_') ? '✅ Valid format' : '❌ Invalid format');
+  console.log('API Key:', env.groqApiKey?.startsWith('gsk_') ? '✅ Valid format' : '❌ Invalid format');
   console.log('');
 
   try {

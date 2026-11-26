@@ -1,6 +1,7 @@
 import { Groq } from 'groq-sdk';
+import { env } from '../config/env.js';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: env.groqApiKey });
 
 // YOUR Groq Organization Models (from console.groq.com limits)
 export const GROQ_MODELS = {
@@ -277,4 +278,4 @@ export const listAvailableModels = async () => {
 /**
  * Check if Groq is available/configured
  */
-export const isGroqAvailable = () => !!process.env.GROQ_API_KEY;
+export const isGroqAvailable = () => !!env.groqApiKey;

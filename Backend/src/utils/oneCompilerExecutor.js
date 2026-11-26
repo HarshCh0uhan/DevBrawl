@@ -1,9 +1,7 @@
 import fetch from "node-fetch";
+import { env } from "../config/env.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST;
-
 const MAX_SOURCE_SIZE = 100 * 1024; // 100KB
 const USER_RATE_LIMIT = 10; // per minute
 
@@ -36,7 +34,7 @@ const ONECOMPILER_LANGUAGES = {
 // ─── Core: Execute via OneCompiler API ────────────────────────────────────────
 const executeOneCompiler = async (sourceCode, languageId, stdin = "") => {
   // Validate env vars at call time (not import time) so health checks don't crash
-  if (!RAPIDAPI_KEY || !RAPIDAPI_HOST) {
+  if (!env.rapidApiKey || !env.rapidApiHost) {
     throw new Error("RAPIDAPI_KEY / RAPIDAPI_HOST not configured");
   }
 
@@ -45,12 +43,12 @@ const executeOneCompiler = async (sourceCode, languageId, stdin = "") => {
     throw new Error(`Unsupported language ID: ${languageId}`);
   }
 
-  const response = await fetch(`https://${RAPIDAPI_HOST}/api/v1/run`, {
+  const response = await fetch(`https://${env.rapidApiHost}/api/v1/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-RapidAPI-Key": RAPIDAPI_KEY,
-      "X-RapidAPI-Host": RAPIDAPI_HOST,
+      "X-RapidAPI-Key": env.rapidApiKey,
+      "X-RapidAPI-Host": env.rapidApiHost,
     },
     body: JSON.stringify({
       language: langConfig.language,

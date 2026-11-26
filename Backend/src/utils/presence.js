@@ -1,9 +1,10 @@
 import { leaveRoomInternal } from "../controllers/room.controller.js";
+import { env } from "../config/env.js";
 
 // How long a dropped socket may stay away before the user is removed from the
 // room. Covers page refresh, brief network blips and tab sleep: the client
 // re-joins on reconnect and cancels the pending removal.
-const GRACE_MS = () => Number(process.env.PRESENCE_GRACE_MS ?? 10000);
+const GRACE_MS = () => env.presenceGraceMs;
 
 const pendingLeaves = new Map(); // "ROOM:userId" -> Timeout
 

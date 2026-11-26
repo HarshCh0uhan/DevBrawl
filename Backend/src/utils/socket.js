@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import { env } from "../config/env.js";
 import { socketAuthMiddleware } from "../middlewares/auth.socket.middleware.js";
 import { Room } from "../models/room.model.js";
 import { Submission } from "../models/submission.model.js";
@@ -89,7 +90,7 @@ export const initializeSocket = (httpServer) => {
     "http://localhost:3000",
     "http://127.0.0.1:5500",
     "null",
-    process.env.FRONTEND_URL,
+    env.frontendUrl,
   ].filter(Boolean);
 
   const io = new Server(httpServer, {

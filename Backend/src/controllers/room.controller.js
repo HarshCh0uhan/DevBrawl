@@ -1,6 +1,7 @@
 import { Room } from "../models/room.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { AccessToken } from 'livekit-server-sdk'
+import { env } from "../config/env.js";
 
 const createRoomInternal = async (payload, user) => {
     const { name, maxParticipants } = payload || {};
@@ -69,8 +70,8 @@ const leaveRoomInternal = async (inviteCode, userId) => {
 
 export const generateLiveKitToken = async (roomName, username) => {
     const token = new AccessToken(
-        process.env.LIVEKIT_API_KEY,
-        process.env.LIVEKIT_API_SECRET,
+        env.livekitApiKey,
+        env.livekitApiSecret,
         { identity: username }
     )
     

@@ -1,5 +1,7 @@
+import './src/config/env.js'
 import express from 'express'
 import cors from 'cors'
+import { env } from './src/config/env.js'
 
 const app = express()
 
@@ -7,7 +9,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
-  process.env.FRONTEND_URL,
+  env.frontendUrl,
 ].filter(Boolean)
 
 app.use(cors({

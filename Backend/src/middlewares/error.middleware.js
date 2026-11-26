@@ -1,6 +1,8 @@
+import { env } from "../config/env.js";
+
 const errorMiddleware = (err, req, res, next) => {
     
-  if (process.env.NODE_ENV === 'development') {
+  if (env.nodeEnv === 'development') {
     console.error(err.stack);
   }
 

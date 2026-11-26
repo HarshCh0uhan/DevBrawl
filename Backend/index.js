@@ -1,12 +1,11 @@
-import dotenv from "dotenv";
+import './src/config/env.js'
 import { createServer } from "http";
 import app from "./app.js";
 import { initializeSocket } from "./src/utils/socket.js";
 import { connectDB } from "./src/config/db.js";
+import { env } from "./src/config/env.js";
 
-dotenv.config();
-
-const PORT = process.env.PORT || 8000;
+const PORT = env.port;
 const httpServer = createServer(app);
 
 initializeSocket(httpServer);
