@@ -1,34 +1,31 @@
+import { verifyAccessToken } from "../services/token.service.js";
 import { User } from "../models/user.model.js";
-import { ApiError } from "../utils/apiError.js";
-import { verifyAccessToken } from "../utils/verifyAccessToken.js";
 
 export const socketAuthMiddleware = async (socket, next) => {
-    try {
+  try {
+    const token =
+      socket.handshake.auth?.token ||
+      (socket.handshake.headers?.authorization || "").replace("Bearer ", "");
 
-        const token = socket.handshake.auth?.token || 
-                      socket.handshake.headers?.authorization?.replace("Bearer ", "");
-
-        if (!token) {
-            return next(new ApiError(401, "Authentication error: Token missing"));
-        }
-
-
-        const decodedToken = verifyAccessToken(token);
-
-        const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
-
-        if (!user) {
-            return next(new ApiError(401, "Authentication error: User not found"));
-        }
-
-        socket.user = user;
-        
-        next();
-    } catch (error) {
-        console.error("🔒 Socket Auth Failure:", error.message);
-        // Client reads err.data.code in its connect_error handler to decide to log out.
-        const authError = new ApiError(401, "Authentication error: Invalid or expired token");
-        authError.data = { code: error.code || "TOKEN_INVALID" };
-        return next(authError);
+    if (!token) {
+      const err = new Error("Missing token");
+      err.data = { code: "TOKEN_INVALID" };
+      return next(err);
     }
+
+    const decoded = verifyAccessToken(token);
+    const user = await User.findById(decoded._id).select("-password -refreshToken");
+    if (!user) {
+      const err = new Error("User not found");
+      err.data = { code: "TOKEN_INVALID" };
+      return next(err);
+    }
+
+    socket.user = user;
+    return next();
+  } catch (err) {
+    const authError = new Error(err.message || "Authentication failed");
+    authError.data = { code: err.code || "TOKEN_INVALID" };
+    return next(authError);
+  }
 };
