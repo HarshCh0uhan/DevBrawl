@@ -1,4 +1,4 @@
-import { Question } from "../model/question.model.js";
+import { Question } from "../models/question.model.js";
 import { generateQuestion } from "../services/aiQuestionGenerator.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";

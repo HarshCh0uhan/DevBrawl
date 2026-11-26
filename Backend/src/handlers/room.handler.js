@@ -1,7 +1,7 @@
 //Match Lifecycle & Turn Management
 
 import { createRoomInternal, joinRoomInternal } from "../controllers/room.controller.js";
-import { Room } from "../model/room.model.js";
+import { Room } from "../models/room.model.js";
 import { advanceTurn } from "../utils/socket.js";
 import { cancelPendingLeave, hasLiveSocket, removeUserFromRoom } from "../utils/presence.js";
 

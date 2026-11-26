@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { executeBrawlCode } from "../controllers/code.controller.js";
-import { authenticateUser } from "../utils/auth.middlewear.js";
+import { userAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
 // POST: /api/v1/compiler/run-code  (now requires auth)
-router.route("/run-code").post(authenticateUser, executeBrawlCode);
+router.route("/run-code").post(userAuth, executeBrawlCode);
 
 // GET: /api/v1/compiler/health
 router.route("/health").get((req, res) => {

@@ -1,6 +1,6 @@
 
-import { Question } from "../model/question.model.js";
-import { Submission } from "../model/submission.model.js";
+import { Question } from "../models/question.model.js";
+import { Submission } from "../models/submission.model.js";
 import { executeAgainstTestCases, isRateLimited } from "../utils/oneCompilerExecutor.js";
 import { wrapCode } from "./codeWrapper.js";
 import { ApiError } from "../utils/apiError.js";

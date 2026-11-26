@@ -1,9 +1,9 @@
 
-import { Submission } from "../model/submission.model.js";
-import { Question } from "../model/question.model.js";
-import { SCORE_WEIGHTS } from "../model/submission.model.js";
+import { Submission } from "../models/submission.model.js";
+import { Question } from "../models/question.model.js";
+import { SCORE_WEIGHTS } from "../models/submission.model.js";
 import { scoreSubmission } from "./aiScoringService.js";
-import { Room } from "../model/room.model.js";
+import { Room } from "../models/room.model.js";
 import { compileAndBroadcastLeaderboard } from "./leaderBoard.service.js";
 
 
@@ -119,7 +119,7 @@ const checkAndTriggerFinalLeaderboard = async (roomId) => {
   try {
     const normalizedRoomId = roomId.toUpperCase();
 
-    // const { Room } = await import("../model/room.model.js");
+    // const { Room } = await import("../models/room.model.js");
     console.log(`🔍 Querying room with inviteCode: "${normalizedRoomId}" (length: ${normalizedRoomId.length})`);
 
     const room = await Room.findOne({ inviteCode: normalizedRoomId });
