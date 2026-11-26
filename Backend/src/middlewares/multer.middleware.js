@@ -12,11 +12,9 @@ if (!fs.existsSync(tempDir)) {
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        console.log("📂 Multer destination called");
         cb(null, tempDir);
     },
     filename: function (req, file, cb) {
-        console.log("📝 Multer filename called:", file.originalname);
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, uniqueSuffix + '-' + file.originalname);
     }
@@ -28,7 +26,6 @@ export const upload = multer({
         fileSize: 10 * 1024 * 1024, // 10MB limit
     },
     fileFilter: function (req, file, cb) {
-        console.log("🔍 Multer fileFilter called:", file);
         cb(null, true);
     }
 });

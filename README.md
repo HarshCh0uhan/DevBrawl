@@ -180,6 +180,8 @@ DevBrawl/
 // Backend/src/utils/oneCompilerExecutor.js
 // Supports: JavaScript, Python, Java, C++, Go, Rust
 // Per-user rate limiting (10 requests/min), 100KB source cap
+// Run Code validation returns HTTP 400; execution results keep a flat status/output response
+// OneCompiler's ~5s sandbox runtime limit is reported as "Time Limit Exceeded"
 // Every test case costs one RapidAPI request
 ```
 
