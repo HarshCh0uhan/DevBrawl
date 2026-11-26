@@ -1,38 +1,24 @@
 import fetch from "node-fetch";
 import { env } from "../config/env.js";
+import { LANG } from "../constants/languages.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-const MAX_SOURCE_SIZE = 100 * 1024; // 100KB
-const USER_RATE_LIMIT = 10; // per minute
-
-// ─── Per-User Rate Limiter ────────────────────────────────────────────────────
-const userRateMap = new Map();
-
-export const isRateLimited = (userId, maxRequests = USER_RATE_LIMIT) => {
-  const now = Date.now();
-  const windowMs = 60 * 1000;
-
-  if (!userRateMap.has(userId)) userRateMap.set(userId, []);
-  const timestamps = userRateMap.get(userId).filter((t) => now - t < windowMs);
-  userRateMap.set(userId, timestamps);
-
-  if (timestamps.length >= maxRequests) return true;
-  timestamps.push(now);
-  return false;
-};
+// OneCompiler's sandbox currently reports hard-killed ~5s executions as success
+// with empty output, so normalize that provider-side limit to a timeout result.
+const ONECOMPILER_RUNTIME_LIMIT_MS = 5000;
 
 // ─── Language Mapping (Judge0 IDs → OneCompiler language & file names) ────────
 const ONECOMPILER_LANGUAGES = {
-  63: { language: "javascript", fileName: "main.js" },     // JavaScript
-  71: { language: "python", fileName: "main.py" },         // Python
-  62: { language: "java", fileName: "Main.java" },         // Java (must be Main.java)
-  54: { language: "cpp", fileName: "main.cpp" },           // C++
-  60: { language: "go", fileName: "main.go" },             // Go
-  73: { language: "rust", fileName: "main.rs" },           // Rust
+  [LANG.JS]: { language: "javascript", fileName: "main.js" },
+  [LANG.PYTHON]: { language: "python", fileName: "main.py" },
+  [LANG.JAVA]: { language: "java", fileName: "Main.java" },
+  [LANG.CPP]: { language: "cpp", fileName: "main.cpp" },
+  [LANG.GO]: { language: "go", fileName: "main.go" },
+  [LANG.RUST]: { language: "rust", fileName: "main.rs" },
 };
 
 // ─── Core: Execute via OneCompiler API ────────────────────────────────────────
-const executeOneCompiler = async (sourceCode, languageId, stdin = "") => {
+const executeOneCompiler = async (sourceCode, languageId, stdin = "", timeoutMs = 10000) => {
   // Validate env vars at call time (not import time) so health checks don't crash
   if (!env.rapidApiKey || !env.rapidApiHost) {
     throw new Error("RAPIDAPI_KEY / RAPIDAPI_HOST not configured");
@@ -43,107 +29,120 @@ const executeOneCompiler = async (sourceCode, languageId, stdin = "") => {
     throw new Error(`Unsupported language ID: ${languageId}`);
   }
 
-  const response = await fetch(`https://${env.rapidApiHost}/api/v1/run`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-RapidAPI-Key": env.rapidApiKey,
-      "X-RapidAPI-Host": env.rapidApiHost,
-    },
-    body: JSON.stringify({
-      language: langConfig.language,
-      stdin,
-      files: [{ name: langConfig.fileName, content: sourceCode }],
-    }),
-  });
+  try {
+    const response = await fetch(`https://${env.rapidApiHost}/api/v1/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-RapidAPI-Key": env.rapidApiKey,
+        "X-RapidAPI-Host": env.rapidApiHost,
+      },
+      body: JSON.stringify({
+        language: langConfig.language,
+        stdin,
+        files: [{ name: langConfig.fileName, content: sourceCode }],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OneCompiler API error (${response.status}): ${err}`);
-  }
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`OneCompiler API error (${response.status}): ${err}`);
+    }
 
-  const data = await response.json();
+    const data = await response.json();
 
-  // Log quota remaining for monitoring
-  if (typeof data.limitRemaining === "number") {
-    console.log(`📊 OneCompiler quota remaining: ${data.limitRemaining}`);
-  }
+    // Log quota remaining for monitoring
+    if (typeof data.limitRemaining === "number") {
+      console.log(`📊 OneCompiler quota remaining: ${data.limitRemaining}`);
+    }
 
-  // Normalize OneCompiler response to match our existing format
-  // OneCompiler uses `exception` for compilation errors, `stderr` for runtime errors
-  const exception = data.exception || "";
-  const stderr = data.stderr || "";
-  const stdout = data.stdout || "";
-  const executionTimeMs = data.executionTime || 0;
+    // Normalize OneCompiler response to match our existing format.
+    const exception = data.exception || "";
+    const stderr = data.stderr || "";
+    const stdout = data.stdout || "";
+    const executionTimeMs = data.executionTime || 0;
 
-  // Compilation error detection: check `exception` for "compil" (case-insensitive)
-  const isCompilationError = exception.toLowerCase().includes("compil");
+    const isCompilationError = exception.toLowerCase().includes("compil");
+    if (isCompilationError) {
+      return {
+        stdout: "",
+        stderr: exception || "Compilation failed",
+        code: 1,
+        timedOut: false,
+        executionTimeMs: 0,
+        compilationFailed: true,
+      };
+    }
 
-  if (isCompilationError) {
+    const hitSilentRuntimeLimit =
+      data.status === "success" &&
+      stdout.length === 0 &&
+      stderr.length === 0 &&
+      executionTimeMs >= ONECOMPILER_RUNTIME_LIMIT_MS;
+
+    if (hitSilentRuntimeLimit) {
+      return {
+        stdout: "",
+        stderr: `Execution exceeded OneCompiler's ${ONECOMPILER_RUNTIME_LIMIT_MS}ms runtime limit`,
+        code: 124,
+        timedOut: true,
+        executionTimeMs,
+        compilationFailed: false,
+      };
+    }
+
+    const hasRuntimeError = data.status !== "success" || stderr.length > 0;
+    if (hasRuntimeError) {
+      return {
+        stdout,
+        stderr: stderr || exception || "Runtime error",
+        code: 1,
+        timedOut: false,
+        executionTimeMs,
+        compilationFailed: false,
+      };
+    }
+
     return {
-      stdout: "",
-      stderr: exception || "Compilation failed",
-      code: 1,
+      stdout: data.stdout || "",
+      stderr: "",
+      code: 0,
       timedOut: false,
-      executionTimeMs: 0,
-      compilationFailed: true,
-    };
-  }
-
-  // Runtime error: non-zero exit or stderr present
-  const hasRuntimeError = data.status !== "success" || stderr.length > 0;
-
-  if (hasRuntimeError) {
-    return {
-      stdout,
-      stderr: stderr || exception || "Runtime error",
-      code: 1,
-      timedOut: false,
-      executionTimeMs,
+      executionTimeMs: data.executionTime || 0,
       compilationFailed: false,
     };
+  } catch (err) {
+    if (err?.name === "AbortError" || err?.name === "TimeoutError") {
+      return {
+        stdout: "",
+        stderr: `Execution exceeded ${timeoutMs}ms`,
+        code: 124,
+        timedOut: true,
+        executionTimeMs: timeoutMs,
+        compilationFailed: false,
+      };
+    }
+    throw err;
   }
-
-  // Success
-  return {
-    stdout: data.stdout || "",
-    stderr: "",
-    code: 0,
-    timedOut: false,
-    executionTimeMs: data.executionTime || 0,
-    compilationFailed: false,
-  };
 };
 
-// ─── Public: Execute code (no stdin) - for "Run Code" button ──────────────────
+// Caller must validate sourceCode and languageId before execution.
 export const executeCode = async (sourceCode, languageId, { timeoutMs = 10000 } = {}) => {
-  if (Buffer.byteLength(sourceCode, "utf8") > 100 * 1024) {
-    throw new Error("Source code too large. Max 100KB.");
-  }
-  return executeOneCompiler(sourceCode, languageId, "");
+  return executeOneCompiler(sourceCode, languageId, "", timeoutMs);
 };
 
-// ─── Public: Execute with stdin (single test case) ────────────────────────────
+// Caller must validate sourceCode and languageId before execution.
 export const executeWithStdin = async (sourceCode, languageId, stdin, { timeoutMs = 10000 } = {}) => {
-  if (Buffer.byteLength(sourceCode, "utf8") > 100 * 1024) {
-    throw new Error("Source code too large. Max 100KB.");
-  }
-  return executeOneCompiler(sourceCode, languageId, stdin);
+  return executeOneCompiler(sourceCode, languageId, stdin, timeoutMs);
 };
 
-// ─── Public: Execute against multiple test cases ──────────────────────────────
+// Caller must validate sourceCode and languageId before execution.
 export const executeAgainstTestCases = async (sourceCode, languageId, testCases, { timeoutMs = 10000 } = {}) => {
-  if (Buffer.byteLength(sourceCode, "utf8") > 100 * 1024) {
-    throw new Error("Source code too large. Max 100KB.");
-  }
-
   const results = [];
   for (const tc of testCases) {
-    const result = await executeOneCompiler(sourceCode, languageId, tc.input);
+    const result = await executeOneCompiler(sourceCode, languageId, tc.input, timeoutMs);
     results.push(result);
   }
   return results;
 };
-
-// ─── Rate Limiter Export ──────────────────────────────────────────────────────
-// (already exported above)

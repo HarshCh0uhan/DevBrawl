@@ -119,22 +119,10 @@ const checkAndTriggerFinalLeaderboard = async (roomId) => {
   try {
     const normalizedRoomId = roomId.toUpperCase();
 
-    // const { Room } = await import("../models/room.model.js");
-    console.log(`🔍 Querying room with inviteCode: "${normalizedRoomId}" (length: ${normalizedRoomId.length})`);
-
     const room = await Room.findOne({ inviteCode: normalizedRoomId });
-    console.log(`🔍 Raw submission.roomId was: "${roomId}"`);
-    console.log(`🔍 Room status check for ${normalizedRoomId}:`, room?.gameStatus ?? "room not found");
-    const allRooms = await Room.find({}, { inviteCode: 1, gameStatus: 1, _id: 0 });
-    console.log(`🔍 All rooms in DB:`, JSON.stringify(allRooms));
-
 
     if (room && room.gameStatus === "all_done") {
-      
-      // const { compileAndBroadcastLeaderboard } = await import("./leaderBoard.service.js");
-      console.log(`🎯 WORKER: Room status verified as 'all_done'. Firing 'compileAndBroadcastLeaderboard' service now!`);
-      console.log(`🏆 Round finished! Launching leaderboard dashboard for Room ${normalizedRoomId}`);
-      
+
       // Pass the normalized uppercase room string to prevent channel scattering
       await compileAndBroadcastLeaderboard(ioInstance, normalizedRoomId);
     }

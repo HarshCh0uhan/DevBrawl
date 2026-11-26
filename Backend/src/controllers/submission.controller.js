@@ -1,7 +1,9 @@
 
 import { Question } from "../models/question.model.js";
 import { Submission } from "../models/submission.model.js";
-import { executeAgainstTestCases, isRateLimited } from "../utils/oneCompilerExecutor.js";
+import { executeAgainstTestCases } from "../utils/oneCompilerExecutor.js";
+import { isRateLimited } from "../utils/rateLimiter.js";
+import { validateRunCode } from "../validators/code.validators.js";
 import { wrapCode } from "./codeWrapper.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
@@ -46,11 +48,9 @@ export const submitSolution = asyncHandler(async (req, res) => {
   if (!roomId || !questionId || !sourceCode || !languageId) {
     throw new ApiError(400, "roomId, questionId, sourceCode and languageId are required");
   }
+  validateRunCode({ sourceCode, languageId });
   if (isRateLimited(userId.toString())) {
     throw new ApiError(429, "Too many submissions. Max 10 per minute.");
-  }
-  if (Buffer.byteLength(sourceCode, "utf8") > 100 * 1024) {
-    throw new ApiError(400, "Source code too large. Max 100KB.");
   }
 
   // Enforce uniform casing cleanly inside the function scope

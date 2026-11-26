@@ -121,7 +121,7 @@ export default function MonacoEditor({
       console.error("❌ Sandbox error:", error.message)
       const serverMsg = error.response?.data?.output || error.response?.data?.message
       setTerminalOutput(serverMsg || 'Failed to communicate with runtime server sandbox.')
-      setExecutionStatus('CONNECTION ERROR')
+      setExecutionStatus(error.response?.data?.status || 'CONNECTION ERROR')
     } finally {
       setIsRunning(false)
     }

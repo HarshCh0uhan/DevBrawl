@@ -1,13 +1,14 @@
 // ─── Code Wrapper
 // Automatically wraps user code so they don't need to worry about
 // boilerplate (class names, main methods, includes etc.)
+import { LANG } from "../constants/languages.js";
 
 export const wrapCode = (sourceCode, languageId) => {
   switch (languageId) {
     // ── Java ────────────────────────────────────────────────────────────────
     // If user already has a class definition → extract body and rewrap as Main
     // If user just wrote logic → wrap everything in Main + main()
-    case 62: {
+    case LANG.JAVA: {
       const hasClassDefinition = /class\s+\w+/.test(sourceCode);
       const hasMainMethod =
         /public\s+static\s+void\s+main\s*\(/.test(sourceCode);
@@ -45,7 +46,7 @@ public class Main {
     // ── C++ ─────────────────────────────────────────────────────────────────
     // If user already has #include and main() → no change
     // If user just wrote main body → wrap with common includes + main()
-    case 54: {
+    case LANG.CPP: {
       const hasIncludes = /#include/.test(sourceCode);
       const hasMain = /int\s+main\s*\(/.test(sourceCode);
 
@@ -92,12 +93,12 @@ int main() {
 
     // ── JavaScript ──────────────────────────────────────────────────────────
     // No wrapping needed — Node runs any JS directly
-    case 63:
+    case LANG.JS:
       return sourceCode;
 
     // ── Python ──────────────────────────────────────────────────────────────
     // No wrapping needed — Python runs any script directly
-    case 71:
+    case LANG.PYTHON:
       return sourceCode;
 
     default:

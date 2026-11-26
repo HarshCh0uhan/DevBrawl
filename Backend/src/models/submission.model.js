@@ -41,7 +41,7 @@ const submissionSchema = new mongoose.Schema(
       required: true,
     },
     languageId: {
-      type: Number, // 63=JS, 71=Python, 62=Java, 54=C++
+      type: Number, // See constants/languages.js for supported language IDs.
       required: true,
     },
 

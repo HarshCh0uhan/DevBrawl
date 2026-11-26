@@ -1,6 +1,7 @@
 import { generateStructuredJSON as groqGenerate, isGroqAvailable } from '../utils/groq.js';
 import { generateStructuredJSON as openrouterGenerate, isOpenRouterAvailable } from '../utils/openrouter.js';
 import { env } from '../config/env.js';
+import { LANGUAGE_LABELS } from '../constants/languages.js';
 
 const AI_PROVIDER = env.aiProvider;
 
@@ -35,8 +36,7 @@ const aiScoringSchema = {
 };
 
 const buildUserPrompt = ({ questionPrompt, sourceCode, languageId, testsPassed, testsTotal, testResults }) => {
-  const languageNames = { 63: "JavaScript", 71: "Python", 62: "Java", 54: "C++" };
-  const languageName = languageNames[languageId] || "Unknown";
+  const languageName = LANGUAGE_LABELS[languageId] || "Unknown";
 
   const testSummary = testResults
     .map((tr) => `  - Test ${tr.testCaseIndex + 1}: ${tr.status} (${tr.executionTimeMs}ms)`)
