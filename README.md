@@ -123,9 +123,10 @@ Copy `Backend/.env.example` to `Backend/.env` and fill in the values.
 | `PORT` | No (default 8000) | Backend HTTP port |
 | `NODE_ENV` | No | `development` or `production` |
 | `MONGODB_URI` | **Yes** | MongoDB Atlas or native connection string |
-| `DB_NAME` | No (default `devbrawl`) | Database name |
 | `ACCESS_TOKEN_SECRET` | **Yes** | JWT signing secret (64+ chars) |
 | `ACCESS_TOKEN_EXPIRY` | No (default `15m`) | JWT lifetime |
+| `REFRESH_TOKEN_SECRET` | **Yes** | Separate secret for refresh-token signing |
+| `REFRESH_TOKEN_EXPIRY` | No (default `7d`) | Refresh-token lifetime |
 | `RAPIDAPI_KEY` | **Yes** | OneCompiler RapidAPI key |
 | `RAPIDAPI_HOST` | **Yes** | `onecompiler-apis.p.rapidapi.com` |
 | `GEMINI_API_KEY` | Recommended | Gemini AI |
@@ -150,8 +151,8 @@ DevBrawl/
 │   ├── src/
 │   │   ├── controllers/        # Route handlers (code, submission, question, user)
 │   │   ├── handlers/           # Socket.io event handlers
-│   │   ├── middlewears/        # Auth, error, multer
-│   │   ├── model/              # Mongoose schemas
+│   │   ├── middlewares/         # Auth, error, multer
+│   │   ├── models/              # Mongoose schemas
 │   │   ├── routes/             # API routes
 │   │   ├── services/           # Business logic (AI, scoring, leaderboard)
 │   │   ├── utils/              # Helpers (OneCompiler, socket, auth, AI clients)
@@ -164,7 +165,8 @@ DevBrawl/
 │   │   ├── components/         # React components
 │   │   ├── pages/              # Page components
 │   │   ├── store/              # Zustand state
-│   │   ├── utils/              # Socket, axios, Excalidraw canvas
+│   │   ├── utils/               # Socket, axios, sync and API helpers
+│   │   ├── constants/           # Language IDs, topics, shared values
 │   │   └── main.jsx
 │   └── package.json
 ├── AGENTS.md                   # AI assistant workflow rules
@@ -204,7 +206,7 @@ DevBrawl/
 // Socket.io for: code sync, canvas sync, chat, turn management
 // Backend/src/handlers/ + Backend/src/utils/socket.js
 // Canvas: Excalidraw (MIT) with element-level sync through the existing Socket.IO room.
-// Frontend/src/utils/ExcalidrawCanvas.jsx sends only changed elements + tombstones.
+// Frontend/src/components/ExcalidrawCanvas.jsx sends only changed elements + tombstones.
 ```
 
 ### 5. Turn-Based Gameplay
@@ -229,8 +231,8 @@ DevBrawl/
 
 ### 8. JWT Token Auto-Refresh
 ```javascript
-// Access tokens live in Zustand memory; only the user profile is persisted.
-// An HttpOnly refresh cookie restores sessions and rotates on refresh.
+// Access tokens expire after 15 minutes and live in Zustand memory only.
+// A 7-day HttpOnly refresh cookie rotates to restore sessions silently.
 // Axios serializes concurrent 401 refreshes and retries queued requests.
 // Files: Frontend/src/store/authStore.js, Frontend/src/utils/axios.js
 ```
