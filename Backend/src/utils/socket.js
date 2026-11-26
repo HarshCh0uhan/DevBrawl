@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
-import { socketAuthMiddleware } from "../middlewears/auth.socket.middlewear.js";
-import { Room } from "../model/room.model.js";
-import { Submission } from "../model/submission.model.js";
+import { socketAuthMiddleware } from "../middlewares/auth.socket.middleware.js";
+import { Room } from "../models/room.model.js";
+import { Submission } from "../models/submission.model.js";
 import { setIoInstance } from "../services/aiScoringQueue.js";
 import { scheduleLeave } from "./presence.js";
 import { compileAndBroadcastLeaderboard } from "../services/leaderBoard.service.js";

@@ -1,7 +1,7 @@
 import { generateText as groqGenerateText, isGroqAvailable } from "../utils/groq.js";
 import { generateText as openrouterGenerateText, isOpenRouterAvailable } from "../utils/openrouter.js";
-import { Submission } from "../model/submission.model.js";
-import { Room } from "../model/room.model.js";
+import { Submission } from "../models/submission.model.js";
+import { Room } from "../models/room.model.js";
 
 // Emits the summary to the room and stores a copy on the Room so late/reconnecting
 // players can still get it. sourceCode is dropped from the stored copy (the score

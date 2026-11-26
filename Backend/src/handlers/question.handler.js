@@ -1,7 +1,7 @@
 //ai question generator 
 
 import { generateQuestion } from "../services/aiQuestionGenerator.js";
-import { Question } from "../model/question.model.js";
+import { Question } from "../models/question.model.js";
 
 const sanitizeQuestion = (question) => ({
   _id: question._id,

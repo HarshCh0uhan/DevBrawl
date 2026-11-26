@@ -1,4 +1,4 @@
-import { Room } from "../model/room.model.js";
+import { Room } from "../models/room.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { AccessToken } from 'livekit-server-sdk'
 

@@ -35,7 +35,7 @@ import userRouter from './src/routes/user.routes.js'
 import compilerRouter from './src/routes/compiler.routes.js'
 import submissionRouter from './src/routes/submission.routes.js'
 import questionRouter from './src/routes/question.routes.js'
-import errorMiddleware from './src/middlewears/error.middlewear.js'
+import errorMiddleware from './src/middlewares/error.middleware.js'
 
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/compiler", compilerRouter);
