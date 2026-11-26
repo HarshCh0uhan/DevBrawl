@@ -155,6 +155,7 @@ import('./src/services/aiQuestionGenerator.js').then(m =>
 | RAPIDAPI quota exhausted (1,000/mo) | Free tier is hard-capped — switch to paid tier or reduce test cases per submission |
 | RAPIDAPI_KEY / RAPIDAPI_HOST missing | Check `Backend/.env`; the health endpoint will report degraded |
 | OneCompiler returns empty | `.env` keys stale; re-issue at https://rapidapi.com/onecompiler |
+| OneCompiler execution times out | The sandbox has an approximately 5-second runtime limit; optimize submitted code or reduce work per test case |
 | Mongo validation error | Check required fields in returned object |
 | Server runs old code | `taskkill /F /PID <pid>` then `npm run dev` |
 | AI returns empty | Model doesn't support JSON mode → fallback to non-JSON |
