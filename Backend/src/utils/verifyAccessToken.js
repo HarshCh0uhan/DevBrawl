@@ -1,14 +1,11 @@
 import jwt from "jsonwebtoken";
 import { ApiError } from "./apiError.js";
+import { env } from "../config/env.js";
 
-// .env.example historically documented JWT_SECRET / JWT_EXPIRY while the code
-// read ACCESS_TOKEN_SECRET / ACCESS_TOKEN_EXPIRY. Accept both so a deploy with
-// either naming works.
-export const getAccessSecret = () =>
-  process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
+// Secrets and expiry now come from the single validated config module.
+export const getAccessSecret = () => env.accessTokenSecret;
 
-export const getAccessExpiry = () =>
-  process.env.ACCESS_TOKEN_EXPIRY || process.env.JWT_EXPIRY || "7d";
+export const getAccessExpiry = () => env.accessTokenExpiry;
 
 /**
  * Verifies an access token and always fails with an ApiError(401), never a raw

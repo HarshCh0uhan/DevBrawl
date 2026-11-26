@@ -1,7 +1,8 @@
 import { generateStructuredJSON as groqGenerate, isGroqAvailable } from '../utils/groq.js';
 import { generateStructuredJSON as openrouterGenerate, isOpenRouterAvailable } from '../utils/openrouter.js';
+import { env } from '../config/env.js';
 
-const AI_PROVIDER = process.env.AI_PROVIDER || 'auto';
+const AI_PROVIDER = env.aiProvider;
 
 const questionResponseSchema = {
   type: "OBJECT",

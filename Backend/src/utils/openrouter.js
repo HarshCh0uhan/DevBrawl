@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { env } from '../config/env.js';
 
 // OpenRouter configuration for Nemotron 3 Nano Omni (free)
 // Model from: https://openrouter.ai/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free?view=api
@@ -22,7 +23,7 @@ export const generateStructuredJSON = async ({
   topic,      // Optional: for normalization fallback
   difficulty, // Optional: for normalization fallback
 }) => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = env.openrouterApiKey;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY not configured');
   }
@@ -271,7 +272,7 @@ export const generateText = async ({
   temperature = 0.3,
   maxTokens = 1000,
 }) => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = env.openrouterApiKey;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
 
   const response = await fetch(OPENROUTER_API_URL, {
@@ -305,7 +306,7 @@ export const generateText = async ({
 /**
  * Check if OpenRouter is available/configured
  */
-export const isOpenRouterAvailable = () => !!process.env.OPENROUTER_API_KEY;
+export const isOpenRouterAvailable = () => !!env.openrouterApiKey;
 
 /**
  * List available models for debugging
@@ -314,7 +315,7 @@ export const listAvailableModels = async () => {
   try {
     const response = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${env.openrouterApiKey}`,
       },
     });
     const data = await response.json();
