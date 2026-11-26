@@ -239,8 +239,8 @@ DevBrawl/
 
 ## 🔌 API Endpoints
 
-Protected `/api/v1/*` routes require a Bearer access token. Auth login,
-refresh, logout, and registration endpoints are cookie/session entry points.
+Protected `/api/v1/*` routes require a Bearer access token. Registration and
+auth login are public entry points; refresh/logout use the refresh-token cookie.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -248,6 +248,7 @@ refresh, logout, and registration endpoints are cookie/session entry points.
 | `POST` | `/api/v1/users/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/users/login` | Login, returns JWT |
 | `GET` | `/api/v1/users/me` | Current user (auth) |
+| `POST` | `/api/v1/auth/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/auth/login` | Login and set HttpOnly refresh cookie |
 | `POST` | `/api/v1/auth/refresh` | Rotate refresh cookie and return access token |
 | `POST` | `/api/v1/auth/logout` | Revoke refresh session |
