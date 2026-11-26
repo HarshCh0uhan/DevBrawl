@@ -1,45 +1,33 @@
 import './src/config/env.js'
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import { env } from './src/config/env.js'
 
 const app = express()
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://127.0.0.1:5173",
-  env.frontendUrl,
-].filter(Boolean)
-
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, curl)
-    if (!origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    // Allow all Vercel preview deployments
-    if (origin.endsWith('.vercel.app')) return callback(null, true)
-    return callback(new Error(`CORS blocked: ${origin}`))
-  },
-  credentials: false,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  origin: env.frontendUrl,
+  credentials: true,
 }))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+app.use(cookieParser())
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' })
 })
 
 import userRouter from './src/routes/user.routes.js'
+import authRouter from './src/routes/auth.routes.js'
 import compilerRouter from './src/routes/compiler.routes.js'
 import submissionRouter from './src/routes/submission.routes.js'
 import questionRouter from './src/routes/question.routes.js'
 import errorMiddleware from './src/middlewares/error.middleware.js'
 
 app.use("/api/v1/users", userRouter)
+app.use('/api/v1/auth', authRouter)
 app.use("/api/v1/compiler", compilerRouter);
 app.use("/api/v1/submissions", submissionRouter)
 app.use("/api/v1/questions", questionRouter)
