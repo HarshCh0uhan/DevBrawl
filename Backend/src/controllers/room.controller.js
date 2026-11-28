@@ -2,23 +2,36 @@ import { Room } from "../models/room.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { AccessToken } from 'livekit-server-sdk'
 import { env } from "../config/env.js";
+import bcrypt from "bcryptjs";
 
 const createRoomInternal = async (payload, user) => {
-    const { name, maxParticipants, isPublic = false } = payload || {};
+    const { name, maxParticipants, isPublic = false, isPrivate = false, password, settings } = payload || {};
 
     if (!user?._id) {
         throw new ApiError(401, "Authentication failed. User context missing.");
     }
 
-    const room = await Room.create({
-        name: name || `Room-${user.username}`,
+    if (isPrivate && !password) {
+        throw new ApiError(400, "Room password is required");
+    }
+
+    const roomData = {
+        name: name || `${user.username}'s Room`,
         hostId: user._id,
-        isPublic,
-        settings: { maxPlayers: maxParticipants || 4 },
+        isPublic: Boolean(isPublic && !isPrivate),
+        isPrivate: Boolean(isPrivate),
+        settings: settings || { maxPlayers: maxParticipants || 4 },
         code: "",
         // The host is implicitly ready; otherwise nobody could ever start.
         participants: [{ userId: user._id, username: user.username, isReady: true }],
-    });
+    };
+
+    if (isPrivate) {
+        const salt = await bcrypt.genSalt(10);
+        roomData.password = await bcrypt.hash(password, salt);
+    }
+
+    const room = await Room.create(roomData);
 
     return room;
 };

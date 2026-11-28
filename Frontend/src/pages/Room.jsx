@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../utils/socket';
 import { useAuthStore } from '../store/authStore';
@@ -25,6 +25,11 @@ export default function RoomPage() {
   const [messages, setMessages] = useState([]);
   const [textInput, setTextInput] = useState('');
   const [arenaSummary, setArenaSummary] = useState(null);
+  const [roomPassword, setRoomPassword] = useState('');
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const roomPasswordRef = useRef('');
+  const joinRoomRef = useRef(null);
 
   // Match State Machine (mirrors the server's room.matchState)
   const [matchState, setMatchState] = useState('waiting');
@@ -52,13 +57,23 @@ export default function RoomPage() {
     // (re)connect: a reconnected socket is a brand-new socket that is no longer in
     // the room, so without this the player silently stops receiving every event.
     const joinRoom = () => {
-      socket.emit("join-room", { inviteCode: roomToken }, (res) => {
+      socket.emit("join-room", {
+        inviteCode: roomToken,
+        password: roomPasswordRef.current,
+      }, (res) => {
         if (res?.success) {
+          setNeedsPassword(false);
+          setPasswordError('');
           store.initRoomSession(res.data);
           setMatchState(res.data.matchState || 'waiting');
           setActivePlayerId(res.data.activePlayerId ? String(res.data.activePlayerId) : null);
           syncActiveQuestion();
         } else {
+          if (res?.error === "ROOM_PASSWORD_REQUIRED" || res?.error === "Invalid room password") {
+            setNeedsPassword(true);
+            setPasswordError(res.error === "Invalid room password" ? res.error : '');
+            return;
+          }
           // The server locks the room once a match starts. Anyone who is not
           // already a participant is rejected here and sent back to the lobby.
           if (res?.error?.toLowerCase().includes('spectator')) {
@@ -68,6 +83,7 @@ export default function RoomPage() {
         }
       });
     };
+    joinRoomRef.current = joinRoom;
 
     if (socket.connected) joinRoom();
     socket.on("connect", joinRoom);
@@ -206,6 +222,7 @@ export default function RoomPage() {
       socket.off("phase2-reviewing");
       socket.off("phase2-complete");
       socket.off("phase2-failed");
+      joinRoomRef.current = null;
       store.clearRoomStore();
     };
   }, [inviteCode, navigate]);
@@ -233,6 +250,42 @@ export default function RoomPage() {
   const activePlayerName = store.participants.find(
     (p) => String(p.userId) === String(activePlayerId)
   )?.username || 'Player';
+
+  if (needsPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            joinRoomRef.current?.();
+          }}
+          className="bg-slate-900 p-8 rounded-lg border border-slate-700 max-w-sm w-full space-y-4"
+        >
+          <h2 className="text-xl font-black text-white text-center">Private Room</h2>
+          <p className="text-xs text-slate-400 text-center">This room requires a password to enter.</p>
+          <input
+            type="password"
+            placeholder="Password"
+            value={roomPassword}
+            onChange={(event) => {
+              setRoomPassword(event.target.value);
+              roomPasswordRef.current = event.target.value;
+              setPasswordError('');
+            }}
+            autoFocus
+            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+          />
+          {passwordError && <p className="text-xs text-red-400">{passwordError}</p>}
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded"
+          >
+            Enter Room
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200 antialiased overflow-hidden relative">

@@ -1,10 +1,12 @@
 import { createRoomInternal, joinRoomInternal } from "../controllers/room.controller.js";
 import { Room } from "../models/room.model.js";
 import { cancelPendingLeave, hasLiveSocket, removeUserFromRoom } from "../utils/presence.js";
+import bcrypt from "bcryptjs";
 
 const toClientRoom = (room) => {
   const obj = typeof room.toJSON === "function" ? room.toJSON() : { ...room };
   delete obj.lastSummary;
+  delete obj.password;
   return obj;
 };
 
@@ -17,9 +19,9 @@ export const registerRoomHandlers = (io, socket) => {
       await socket.join(newRoom.inviteCode);
       socket.currentRoom = newRoom.inviteCode;
       if (typeof callback === "function") {
-        callback({ success: true, data: newRoom });
+        callback({ success: true, data: toClientRoom(newRoom) });
       } else {
-        socket.emit("room-created", { success: true, data: newRoom });
+        socket.emit("room-created", { success: true, data: toClientRoom(newRoom) });
       }
     } catch (error) {
       console.error("❌ create-room error:", error.message);
@@ -35,7 +37,7 @@ export const registerRoomHandlers = (io, socket) => {
     const data = typeof payload === "string" ? JSON.parse(payload) : payload;
     try {
       const code = data.inviteCode?.toUpperCase();
-      const room = await Room.findOne({ inviteCode: code });
+      const room = await Room.findOne({ inviteCode: code }).select("+password");
 
       if (!room) return callback?.({ success: false, error: "Room not found" });
 
@@ -44,6 +46,16 @@ export const registerRoomHandlers = (io, socket) => {
         const existingPlayer = room.participants.find(p => p.userId.toString() === socket.user._id.toString());
         if (!existingPlayer) {
           return callback?.({ success: false, error: "Match already in progress. Spectators are not allowed." });
+        }
+      }
+
+      if (room.isPrivate) {
+        if (!data.password) {
+          return callback?.({ success: false, error: "ROOM_PASSWORD_REQUIRED" });
+        }
+        const isMatch = room.password && await bcrypt.compare(data.password, room.password);
+        if (!isMatch) {
+          return callback?.({ success: false, error: "Invalid room password" });
         }
       }
 

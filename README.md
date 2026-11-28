@@ -244,6 +244,13 @@ DevBrawl/
 // Backend/src/handlers/matchmaking.handler.js
 ```
 
+### 10. Private Lobbies
+```javascript
+// Private room passwords are bcrypt-hashed and excluded from socket responses.
+// Joining a private room requires the correct password, including direct links.
+// Backend/src/controllers/room.controller.js + room.handler.js
+```
+
 ---
 
 ## 🔌 API Endpoints
