@@ -9,8 +9,9 @@ export default function Dashboard() {
   const logout = useAuthStore((state) => state.logout);
 
   // --- LOBBY & FORM STATE ---
-  const [room, setRoom] = useState(null); 
+  const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
+  const [matchState, setMatchState] = useState('waiting');
   const [inviteCode, setInviteCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [createError, setCreateError] = useState('');
@@ -30,29 +31,35 @@ export default function Dashboard() {
   useEffect(() => {
     // 1. Sync updated player roster when someone enters the lobby channel
     socket.on("user-joined", (data) => {
-      console.log("👤 user-joined data:", data)
-      console.log("👤 full user-joined data:", JSON.stringify(data))
       if (data.participants) {
         setParticipants(data.participants);
       }
     });
 
     // 2. Clear out player slot instantly on unexpected drop or disconnect
-      socket.on("user-left", (data) => {
-      setParticipants((prev) => 
+    socket.on("user-left", (data) => {
+      setParticipants((prev) =>
         prev.filter(p => p.userId?.toString() !== data.userId?.toString())
       );
     });
 
-    // 3. Global redirect intercept: execute navigation when host starts the match
+    // 3. Ready-state changes are broadcast to the whole lobby
+    socket.on("room-updated", (data) => {
+      if (data.participants) {
+        setParticipants(data.participants);
+      }
+    });
+
+    // 4. Global redirect intercept: execute navigation when host starts the match
     socket.on("room-started", (data) => {
-      console.log("🚀 room-started received:", data) 
+      setMatchState('in_progress');
       navigate(`/room/${data.inviteCode}`);
     });
 
     return () => {
       socket.off("user-joined");
       socket.off("user-left");
+      socket.off("room-updated");
       socket.off("room-started");
     };
   }, [navigate]);
@@ -67,6 +74,7 @@ export default function Dashboard() {
       if (res?.success) {
         setRoom(res.data);
         setParticipants(res.data.participants);
+        setMatchState(res.data.matchState || 'waiting');
       } else {
         setCreateError(res?.error || 'Failed to allocate room space');
       }
@@ -89,17 +97,34 @@ export default function Dashboard() {
         // Stay in dashboard lobby mode, sync participant view metrics
         setRoom(res.data);
         setParticipants(res.data.participants);
+        setMatchState(res.data.matchState || 'waiting');
       } else {
         setJoinError(res?.error || 'Active room node not found');
       }
     });
   };
 
+  const handleToggleReady = () => {
+    if (!room?.inviteCode) return;
+    socket.emit("toggle-ready", { inviteCode: room.inviteCode }, (res) => {
+      if (!res?.success) {
+        alert(res?.error || 'Could not update ready state');
+        return;
+      }
+      setParticipants((prev) => prev.map((p) => (
+        String(p.userId) === String(user?._id)
+          ? { ...p, isReady: res.isReady }
+          : p
+      )));
+    });
+  };
+
   const handleStartRoom = () => {
     if (!room?.inviteCode) return;
-    
-    // Fire event to tell server to broadcast launch signals to all connected lobby tabs
-    socket.emit("start-room-session", { inviteCode: room.inviteCode });
+
+    socket.emit("start-room-session", { inviteCode: room.inviteCode }, (res) => {
+      if (!res?.success) alert(res?.error || 'Could not start the match');
+    });
   };
 
   const handleCopyCode = () => {
@@ -114,11 +139,14 @@ export default function Dashboard() {
     navigate('/login');
   };
 
-  const isHost = room?.hostId?.toString() === user?._id?.toString()
+  const isHost = room?.hostId?.toString() === user?._id?.toString();
+  const myParticipant = participants.find((p) => String(p.userId) === String(user?._id));
+  const maxPlayers = room?.settings?.maxPlayers ?? 6;
+  const isLocked = matchState === 'in_progress';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-mono tracking-tight antialiased">
-      
+
       {/* ─── PROFESSIONAL MINIMAL HEADER ─── */}
       <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-3.5">
         <div className="flex items-center gap-2">
@@ -142,10 +170,10 @@ export default function Dashboard() {
       {/* ─── MAIN HUB CONTAINER ─── */}
       <main className="mx-auto max-w-4xl px-4 py-16">
         {room ? (
-          
+
           /* ─── HI-FI LOBBY GRID VIEW ─── */
           <div className="w-full max-w-2xl mx-auto bg-slate-900 border-4 border-slate-950 rounded-xl p-6 shadow-2xl">
-            
+
             {/* TOP CONTROLS & META BAR */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-4 border-slate-950 pb-4 mb-6 gap-4">
               <div className="text-left">
@@ -159,7 +187,7 @@ export default function Dashboard() {
                   <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">ROOM CODE</span>
                   <span className="text-xl font-mono font-black tracking-widest text-emerald-400">{room.inviteCode}</span>
                 </div>
-                <button 
+                <button
                   onClick={handleCopyCode}
                   className="px-3 py-1 text-xs font-black bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border-2 border-slate-700 transition cursor-pointer uppercase"
                 >
@@ -170,22 +198,24 @@ export default function Dashboard() {
 
             {/* Sub-Header Metrics */}
             <div className="mb-3 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-              <span>Players: {participants.length} / 6</span>
-              <span className="text-blue-400">ready For Battle Folks🔥</span>
+              <span>Players: {participants.length} / {maxPlayers}</span>
+              <span className={isLocked ? 'text-amber-400' : 'text-blue-400'}>
+                {isLocked ? 'Match in Progress 🔒' : 'ready For Battle Folks🔥'}
+              </span>
             </div>
 
             {/* THE LOBBY PLAYER GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
               {/* Map connected roster */}
               {participants.map((player) => {
-                const playerIsHost = player.userId === room.hostId;
-                
+                const playerIsHost = String(player.userId) === String(room.hostId);
+
                 return (
-                  <div 
+                  <div
                     key={player.userId}
                     className={`flex items-center justify-between p-3 rounded-lg border-4 border-slate-950 shadow-md transform transition ${
-                      playerIsHost 
-                        ? 'bg-amber-500 text-slate-950' 
+                      playerIsHost
+                        ? 'bg-amber-500 text-slate-950'
                         : 'bg-emerald-600 text-white'
                     }`}
                   >
@@ -194,9 +224,9 @@ export default function Dashboard() {
                       <div className={`h-10 w-10 rounded-full border-2 border-slate-950 flex items-center justify-center text-lg overflow-hidden shrink-0 ${
                         playerIsHost ? 'bg-amber-600' : 'bg-emerald-700'
                       }`}>
-                        <img 
-                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.username}`} 
-                          alt="avatar" 
+                        <img
+                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.username}`}
+                          alt="avatar"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -207,7 +237,7 @@ export default function Dashboard() {
                         <div className={`text-[10px] font-bold uppercase tracking-wide ${
                           playerIsHost ? 'text-amber-950' : 'text-emerald-200'
                         }`}>
-                          {playerIsHost ? 'Lobby Host' : 'Ready to Brawl'}
+                          {playerIsHost ? 'Lobby Host' : player.isReady ? 'Ready to Brawl' : 'Not Ready'}
                         </div>
                       </div>
                     </div>
@@ -218,17 +248,19 @@ export default function Dashboard() {
                         Host
                       </span>
                     ) : (
-                      <div className="h-6 w-6 rounded-full bg-red-600 border-2 border-slate-950 flex items-center justify-center text-white font-black text-xs cursor-not-allowed shadow-sm select-none">
-                        ✕
+                      <div className={`h-6 w-6 rounded-full border-2 border-slate-950 flex items-center justify-center font-black text-xs shadow-sm select-none ${
+                        player.isReady ? 'bg-emerald-400 text-slate-950' : 'bg-red-600 text-white'
+                      }`}>
+                        {player.isReady ? '✓' : '✕'}
                       </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Pad out open remaining spaces up to 6 positions max */}
-              {Array.from({ length: Math.max(0, 6 - participants.length) }).map((_, index) => (
-                <div 
+              {/* Pad out open remaining spaces up to maxPlayers */}
+              {Array.from({ length: Math.max(0, maxPlayers - participants.length) }).map((_, index) => (
+                <div
                   key={`empty-${index}`}
                   className="flex items-center justify-between p-3 rounded-lg border-4 border-dashed border-slate-800 bg-slate-950/40 text-slate-600 select-none"
                 >
@@ -241,7 +273,7 @@ export default function Dashboard() {
                       <div className="text-[10px] font-bold uppercase text-slate-800">Awaiting Connection...</div>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={handleCopyCode}
                     className="h-6 w-6 rounded-full bg-slate-800 border-2 border-slate-950 flex items-center justify-center text-slate-400 font-black text-md hover:bg-slate-700 hover:text-white transition cursor-pointer"
                   >
@@ -252,23 +284,44 @@ export default function Dashboard() {
             </div>
 
             {/* ACTION PIPELINE TRIGGERS */}
-            <div className="border-t-4 border-slate-950 pt-4 mt-4">
+            <div className="border-t-4 border-slate-950 pt-4 mt-4 space-y-3">
+              {!isHost && myParticipant && (
+                <button
+                  onClick={handleToggleReady}
+                  disabled={isLocked}
+                  className={`w-full rounded-lg border-4 border-slate-950 py-3 text-sm font-black tracking-widest uppercase transition ${
+                    isLocked
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : myParticipant.isReady
+                        ? 'bg-emerald-700 hover:bg-emerald-600 text-white cursor-pointer'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 cursor-pointer'
+                  }`}
+                >
+                  {myParticipant.isReady ? '✓ Ready — Click to Unready' : 'Ready Up'}
+                </button>
+              )}
+
               {isHost ? (
                 <button
                   onClick={handleStartRoom}
-                  className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 border-4 border-slate-950 py-3 text-sm font-black text-white tracking-widest uppercase transition transform active:scale-98 cursor-pointer shadow-md"
+                  disabled={isLocked}
+                  className={`w-full rounded-lg border-4 border-slate-950 py-3 text-sm font-black tracking-widest uppercase transition ${
+                    isLocked
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-md'
+                  }`}
                 >
-                  Launch Workspace Session ⚔️
+                  {isLocked ? 'Match in Progress' : 'Launch Workspace Session ⚔️'}
                 </button>
               ) : (
                 <div className="w-full rounded-lg bg-slate-950 border-4 border-slate-950 py-3 text-center text-xs text-slate-500 font-black tracking-widest uppercase animate-pulse">
-                  Holding Connection // Waiting for Host Launch Signal
+                  {isLocked ? 'Match in Progress' : 'Holding Connection // Waiting for Host Launch Signal'}
                 </div>
               )}
             </div>
           </div>
         ) : (
-          
+
           /* ─── INITIAL CREATION OR INTERCEPT SPLIT CARDS ─── */
           <div className="grid gap-6 md:grid-cols-2">
             {/* Create Room Box */}

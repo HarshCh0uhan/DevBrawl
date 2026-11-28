@@ -50,6 +50,11 @@ export default function RoomPage() {
           store.initRoomSession(res.data);
           syncActiveQuestion();
         } else {
+          // The server locks the room once a match starts. Anyone who is not
+          // already a participant is rejected here and sent back to the lobby.
+          if (res?.error?.toLowerCase().includes('spectator')) {
+            alert(res.error);
+          }
           navigate('/dashboard');
         }
       });

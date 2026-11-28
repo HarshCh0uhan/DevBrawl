@@ -15,7 +15,7 @@ const DIFFICULTIES = ["easy", "medium", "hard"]
 export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
   // ── Question state ──────────────────────────────────────────────────────
   const [question, setQuestion] = useState(null)
-  const [status, setStatus] = useState('idle') 
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
 
   // ── Host picker state ───────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
     try {
       // FORCE structural URL path to utilize your explicit backend api v1 endpoint root
       const res = await api.get(`/questions/${roomId}/${roundNumber}`)
-      
+
       if (res.data?.success && res.data?.data) {
         setQuestion(res.data.data)
         setStatus('ready')
@@ -64,11 +64,6 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
       setError('')
     })
 
-    socket.on("round-question-regenerating", () => {
-      setStatus('regenerating')
-      setError('')
-    })
-
     socket.on("round-question-ready", (data) => {
       setQuestion(data)
       setStatus('ready')
@@ -82,7 +77,6 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
 
     return () => {
       socket.off("round-question-generating")
-      socket.off("round-question-regenerating")
       socket.off("round-question-ready")
       socket.off("round-question-failed")
     }
@@ -98,16 +92,7 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
     })
   }
 
-  const handleRegenerate = () => {
-    socket.emit("regenerate-round-question", {
-      inviteCode: roomId,
-      roundNumber,
-      topic: question?.topic || selectedTopic,
-      difficulty: question?.difficulty || selectedDifficulty,
-    })
-  }
-
-  const isBusy = status === 'generating' || status === 'regenerating'
+  const isBusy = status === 'generating'
   const isLoading = status === 'loading'
 
   return (
@@ -132,7 +117,7 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
             <select
               value={selectedTopic}
               onChange={(e) => setSelectedTopic(e.target.value)}
-              disabled={isBusy || isLoading}
+              disabled={isBusy || isLoading || status === 'ready'}
               className="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer"
             >
               {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -141,7 +126,7 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
             <select
               value={selectedDifficulty}
               onChange={(e) => setSelectedDifficulty(e.target.value)}
-              disabled={isBusy || isLoading}
+              disabled={isBusy || isLoading || status === 'ready'}
               className="rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer uppercase"
             >
               {DIFFICULTIES.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -162,17 +147,9 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
                 {isBusy ? 'Generating...' : '⚡ Start Round'}
               </button>
             ) : (
-              <button
-                onClick={handleRegenerate}
-                disabled={isBusy || isLoading}
-                className={`flex-1 rounded py-2 text-xxs font-black uppercase tracking-wider transition ${
-                  isBusy || isLoading
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-amber-600 hover:bg-amber-500 text-slate-950 cursor-pointer'
-                }`}
-              >
-                {isBusy ? 'Regenerating...' : '🔄 Regenerate Question'}
-              </button>
+              <div className="flex-1 rounded border border-slate-700 bg-slate-900 py-2 text-center text-xxs font-black uppercase tracking-wider text-slate-500">
+                🔒 Question locked for this round
+              </div>
             )}
           </div>
         </div>
@@ -208,12 +185,12 @@ export default function QuestionPanel({ roomId, isHost, roundNumber = 1 }) {
           </div>
         )}
 
-        {/* ── GENERATING / REGENERATING STATE ── */}
+        {/* ── GENERATING STATE ── */}
         {isBusy && (
           <div className="h-full flex flex-col items-center justify-center text-center gap-4 py-12">
             <div className="h-10 w-10 rounded-full border-[3px] border-slate-700 border-t-blue-500 animate-spin" />
             <p className="text-sm font-bold text-blue-400 uppercase tracking-wide animate-pulse">
-              {status === 'generating' ? 'Generating Question...' : 'Regenerating Question...'}
+              Generating Question...
             </p>
             <p className="text-xs text-slate-600 max-w-[220px]">
               AI is crafting a fresh challenge. This usually takes a few seconds.
