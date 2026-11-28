@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Test script to check which Groq models are available for your API key
 
-import { env } from './src/config/env.js';
+import { env } from '../src/config/env.js';
 import { Groq } from 'groq-sdk';
 
 const groq = new Groq({ apiKey: env.groqApiKey });

@@ -8,8 +8,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
-    "test:executor": "node test-onecompiler.js"
+    "dev": "node --watch index.js",
+    "test:executor": "node scripts/test-onecompiler.js",
+    "test:groq": "node scripts/test-groq-models.js",
+    "test:openrouter": "node scripts/test-openrouter.js"
   },
   "dependencies": {
     "axios": "^1.16.1",
