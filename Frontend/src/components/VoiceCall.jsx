@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Room, RoomEvent} from 'livekit-client'
 import api from '../utils/axios'
 
-export default function VoiceCall({ roomName }) {
+export default function VoiceCall({ roomName, isActivePlayer = false, isExplainingPhase = false }) {
   const roomRef = useRef(null)
   const [joined, setJoined] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -32,7 +32,7 @@ export default function VoiceCall({ roomName }) {
       // 4. Connect and enable mic
       await room.connect(url, token)
       await room.localParticipant.setMicrophoneEnabled(true)
-      
+
       setJoined(true)
       console.log("🎙️ joined LiveKit room:", roomName)
     } catch (err) {
@@ -56,6 +56,23 @@ export default function VoiceCall({ roomName }) {
       setParticipants([]);
     };
   }, [roomName]);
+
+  useEffect(() => {
+    if (!roomRef.current || !joined) return;
+
+    const localParticipant = roomRef.current.localParticipant;
+
+    if (isExplainingPhase) {
+      // If it's the explaining phase, ONLY the active player should be unmuted
+      const shouldUnmute = Boolean(isActivePlayer);
+      localParticipant.setMicrophoneEnabled(shouldUnmute);
+      setMuted(!shouldUnmute);
+    } else {
+      // Leaving the explaining phase restores normal voice for everyone.
+      localParticipant.setMicrophoneEnabled(true);
+      setMuted(false);
+    }
+  }, [isExplainingPhase, isActivePlayer, joined]);
 
   return (
     <div className="flex items-center gap-2">

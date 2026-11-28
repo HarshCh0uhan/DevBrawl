@@ -1,11 +1,8 @@
 import { Server } from "socket.io";
 import { env } from "../config/env.js";
 import { socketAuthMiddleware } from "../middlewares/auth.socket.middleware.js";
-import { Room } from "../models/room.model.js";
-import { Submission } from "../models/submission.model.js";
 import { setIoInstance } from "../services/aiScoringQueue.js";
 import { scheduleLeave } from "./presence.js";
-import { compileAndBroadcastLeaderboard } from "../services/leaderBoard.service.js";
 
 import { registerRoomHandlers } from "../handlers/room.handler.js";
 import { registerSyncHandlers } from "../handlers/canvasSync.handler.js";
@@ -14,76 +11,6 @@ import { registerGameHandlers } from "../handlers/game.handler.js";
 
 let _io = null;
 export const getIO = () => _io;
-
-// ── Turn advancement logic (Flawless Event Routing + AI Safeguard Sync) ──
-export const advanceTurn = async (roomCode) => {
-  const io = _io;
-  if (!io) return;
-
-  const normalizedRoomCode = roomCode.toUpperCase();
-  const room = await Room.findOne({ inviteCode: normalizedRoomCode });
-  if (!room || !room.participants || room.participants.length === 0) return;
-
-  // Emit turn-ended for the CURRENT player before advancing
-  const endingPlayer = room.participants[room.currentTurnIndex];
-  if (endingPlayer) {
-    io.to(normalizedRoomCode).emit("turn-ended", {
-      endedPlayerId: (endingPlayer.userId || endingPlayer._id).toString(),
-      endedUsername: endingPlayer.username,
-      turnIndex: room.currentTurnIndex,
-    });
-  }
-
-  room.currentTurnIndex = (room.currentTurnIndex || 0) + 1;
-  const allDone = room.currentTurnIndex >= room.participants.length;
-
-  if (allDone) {
-    room.activePlayerId = null;
-    room.gameStatus = "all_done";
-    await room.save();
-
-    io.to(normalizedRoomCode).emit("all-turns-complete", {
-      message: "All players have completed their turns. Compiling standings...",
-    });
-    console.log(`✅ All turns complete in room ${normalizedRoomCode}. Triggering leaderboard safety check...`);
-
-    const latestSubmission = await Submission.findOne({ 
-      roomId: { $in: [normalizedRoomCode, roomCode] } 
-    }).sort({ createdAt: -1 });
-    
-    if (!latestSubmission || latestSubmission.phase2Status === "completed" || latestSubmission.phase2Status === "failed") {
-      console.log(`🚀 BACKEND [advanceTurn]: Target conditions met! Forcing immediate leaderboard compilation.`);
-      await compileAndBroadcastLeaderboard(io, normalizedRoomCode);
-    } else {
-      console.log(`⏳ Last submission ${latestSubmission._id} is still scoring. Handing over broadcast control to AI queue service.`);
-    }
-  } else {
-    const nextPlayer = room.participants[room.currentTurnIndex];
-
-    // Guard: participant may have left between reads
-    if (!nextPlayer) {
-      room.activePlayerId = null;
-      room.gameStatus = "all_done";
-      await room.save();
-
-      io.to(normalizedRoomCode).emit("all-turns-complete", {
-        message: "All players have completed their turns. Compiling standings...",
-      });
-      return;
-    }
-
-    room.gameStatus = "turn_active";
-    room.activePlayerId = nextPlayer.userId ? nextPlayer.userId : nextPlayer._id;
-    await room.save();
-
-    io.to(normalizedRoomCode).emit("turn-started", {
-      activePlayerId: room.activePlayerId.toString(),
-      activeUsername: nextPlayer.username,
-      turnIndex: room.currentTurnIndex,
-      totalPlayers: room.participants.length,
-    });
-  }
-};
 
 export const initializeSocket = (httpServer) => {
   const allowedOrigins = [

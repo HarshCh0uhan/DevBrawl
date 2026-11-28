@@ -2,40 +2,37 @@
 import { useRoomStore } from '../store/roomStore';
 import VoiceCall from './VoiceCall';
 
-export default function RoomHeader({ 
-  user, 
-  viewMode, 
-  onViewChange, 
-  onToggleProblem, 
-  onToggleChat, 
-  questionPanelOpen, 
-  chatOpen, 
+export default function RoomHeader({
+  user,
+  viewMode,
+  onViewChange,
+  onToggleProblem,
+  onToggleChat,
+  questionPanelOpen,
+  chatOpen,
   onLeave,
-  socket
+  socket,
+  isActivePlayer,
+  isExplainingPhase
 }) {
-  const { 
-    roomCode, 
-    hostId, 
-    turnStatus, 
-    activeUsername, 
-    activePlayerId, 
-    turnIndex, 
-    totalPlayers, 
-    participants 
+  const {
+    roomCode,
+    hostId,
+    turnStatus,
+    activeUsername,
+    activePlayerId,
+    turnIndex,
+    totalPlayers,
+    participants,
+    matchState
   } = useRoomStore();
 
   const isHost = hostId?.toString() === user?._id?.toString();
   const isMyTurn = activePlayerId === user?._id?.toString();
 
-  const handleStartTurn = () => {
-    socket.emit("start-turn", { inviteCode: roomCode }, (res) => {
-      if (!res?.success) console.error("start-turn failed:", res?.error);
-    });
-  };
-
-  const handleSkipTurn = () => {
-    socket.emit("skip-turn", { inviteCode: roomCode }, (res) => {
-      if (!res?.success) console.error("skip-turn failed:", res?.error);
+  const handleStartJudging = () => {
+    socket.emit("start-judging-phase", { inviteCode: roomCode }, (res) => {
+      if (!res?.success) alert(res?.error || "Could not start judging");
     });
   };
 
@@ -107,25 +104,13 @@ export default function RoomHeader({
 
       {/* RIGHT: Admin Actions + Panel Triggers */}
       <div className="flex items-center gap-2">
-        {isHost && (
-          <>
-            {turnStatus === 'waiting' && (
-              <button
-                onClick={handleStartTurn}
-                className="rounded px-3 py-1 text-xxs font-black tracking-wider uppercase border transition cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700"
-              >
-                ▶ Start
-              </button>
-            )}
-            {turnStatus === 'turn_active' && (
-              <button
-                onClick={handleSkipTurn}
-                className="rounded px-3 py-1 text-xxs font-black tracking-wider uppercase border transition cursor-pointer bg-blue-600 hover:bg-blue-500 text-white border-blue-700 shadow-md animate-fade-in"
-              >
-                ⏩ Next
-              </button>
-            )}
-          </>
+        {matchState === 'explaining' && (isHost || isMyTurn) && (
+          <button
+            onClick={handleStartJudging}
+            className="rounded px-3 py-1 text-xxs font-black tracking-wider uppercase border transition cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-600 shadow-md animate-fade-in"
+          >
+            ⚖️ Start Judging
+          </button>
         )}
 
         <button
@@ -146,7 +131,11 @@ export default function RoomHeader({
           💬 CHAT
         </button>
 
-        <VoiceCall roomName={roomCode} />
+        <VoiceCall
+          roomName={roomCode}
+          isActivePlayer={isActivePlayer}
+          isExplainingPhase={isExplainingPhase}
+        />
 
         <button
           onClick={onLeave}
