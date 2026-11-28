@@ -5,13 +5,13 @@ import MonacoEditor from './MonacoEditor';
 import api from '../utils/axios';
 import { JUDGE0_LANGUAGES } from '../constants/languages';
 
-export default function WorkspaceLayout({ viewMode, user}) {
+export default function WorkspaceLayout({ viewMode, user, socket }) {
   const [activePanel, setActivePanel] = useState('canvas');
   const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { roomCode, activeQuestion, activePlayerId, turnStatus } = useRoomStore();
-  const isMyTurn = activePlayerId === user?._id?.toString();
+  const isMyTurn = String(activePlayerId) === String(user?._id);
   const shouldMountCanvas = viewMode === 'canvas' || (viewMode === 'split' && activePanel === 'canvas');
   const shouldMountEditor = viewMode === 'editor' || (viewMode === 'split' && activePanel === 'editor');
 
@@ -29,8 +29,16 @@ export default function WorkspaceLayout({ viewMode, user}) {
         sourceCode: codePayload,
         languageId: JUDGE0_LANGUAGES[selectedLanguage]
       });
-      // Optional success feedback
-      alert("✅ Submission received. AI is scoring your code...");
+
+      // The HTTP endpoint saved the submission. Tell the judging engine to read
+      // it and move the room into the explaining phase.
+      if (isMyTurn) {
+        socket?.emit('submit-code-turn', { inviteCode: roomCode }, (res) => {
+          if (!res?.success) alert(res?.error || 'Could not start the explaining phase');
+        });
+      }
+
+      alert("✅ Submission received. Moving to the explanation phase...");
     } catch (err) {
       const serverMsg = err.response?.data?.message
         || err.response?.data?.errors?.[0]
@@ -45,7 +53,7 @@ export default function WorkspaceLayout({ viewMode, user}) {
 
   return (
     <div className={`flex-1 gap-2 transition-all duration-150 ${viewMode === 'split' ? 'flex flex-col md:flex-row' : 'block relative w-full h-full'}`}>
-      
+
       {/* 🎨 CANVAS PANEL */}
       {(viewMode === 'canvas' || viewMode === 'split') && (
         <div

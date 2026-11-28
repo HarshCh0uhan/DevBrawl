@@ -121,7 +121,7 @@ const checkAndTriggerFinalLeaderboard = async (roomId) => {
 
     const room = await Room.findOne({ inviteCode: normalizedRoomId });
 
-    if (room && room.gameStatus === "all_done") {
+    if (room && room.matchState === "finished") {
 
       // Pass the normalized uppercase room string to prevent channel scattering
       await compileAndBroadcastLeaderboard(ioInstance, normalizedRoomId);

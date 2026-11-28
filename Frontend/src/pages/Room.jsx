@@ -9,6 +9,7 @@ import ArenaLeaderboard from '../components/leaderBoard';
 import RoomHeader from '../components/RoomHeader';
 import WorkspaceLayout from '../components/WorkspaceLayout';
 import SidebarManager from '../components/SideBarManager';
+import JudgingOverlay from '../components/JudgingOverlay';
 
 export default function RoomPage() {
   const { inviteCode } = useParams();
@@ -16,12 +17,18 @@ export default function RoomPage() {
   const user = useAuthStore((state) => state.user);
   const store = useRoomStore();
 
+  const roomCode = inviteCode?.toUpperCase() || '';
+
   const [viewMode, setViewMode] = useState('canvas');
   const [chatOpen, setChatOpen] = useState(false);
   const [questionPanelOpen, setQuestionPanelOpen] = useState(true);
   const [messages, setMessages] = useState([]);
   const [textInput, setTextInput] = useState('');
   const [arenaSummary, setArenaSummary] = useState(null);
+
+  // Match State Machine (mirrors the server's room.matchState)
+  const [matchState, setMatchState] = useState('waiting');
+  const [activePlayerId, setActivePlayerId] = useState(null);
 
   useEffect(() => {
     if (!inviteCode) return;
@@ -48,6 +55,8 @@ export default function RoomPage() {
       socket.emit("join-room", { inviteCode: roomToken }, (res) => {
         if (res?.success) {
           store.initRoomSession(res.data);
+          setMatchState(res.data.matchState || 'waiting');
+          setActivePlayerId(res.data.activePlayerId ? String(res.data.activePlayerId) : null);
           syncActiveQuestion();
         } else {
           // The server locks the room once a match starts. Anyone who is not
@@ -62,6 +71,9 @@ export default function RoomPage() {
 
     if (socket.connected) joinRoom();
     socket.on("connect", joinRoom);
+
+    // Host started the match while this player was already on the room page.
+    socket.on("room-started", joinRoom);
 
     socket.on("user-joined", (data) => {
       if (data.participants) store.setParticipants(data.participants);
@@ -88,6 +100,22 @@ export default function RoomPage() {
 
     socket.on("round-question-ready", (questionData) => {
       store.setActiveQuestion(questionData);
+    });
+
+    // Coding -> Explaining -> Judging transitions from the game loop.
+    socket.on("phase-changed", (data) => {
+      setMatchState(data.matchState);
+      if (data.activePlayerId) setActivePlayerId(String(data.activePlayerId));
+      store.syncPhase(data);
+    });
+
+    // Judging -> next player's Coding (or Finished) after the tally.
+    socket.on("turn-results", (data) => {
+      const nextState = data.nextMatchState || 'coding';
+      const nextActivePlayerId = data.nextActivePlayerId ? String(data.nextActivePlayerId) : null;
+      setMatchState(nextState);
+      setActivePlayerId(nextActivePlayerId);
+      store.syncPhase({ matchState: nextState, activePlayerId: nextActivePlayerId });
     });
 
     socket.on("turn-started", (data) => {
@@ -163,10 +191,13 @@ export default function RoomPage() {
       if (socket.connected) socket.emit("leave-room", { inviteCode: roomToken });
 
       socket.off("connect", joinRoom);
+      socket.off("room-started", joinRoom);
       socket.off("user-joined");
       socket.off("user-left");
       socket.off("receive-message");
       socket.off("round-question-ready");
+      socket.off("phase-changed");
+      socket.off("turn-results");
       socket.off("turn-started");
       socket.off("turn-ended");
       socket.off("turn-skipped");
@@ -197,9 +228,15 @@ export default function RoomPage() {
     navigate('/dashboard');
   };
 
+  const isActivePlayer = String(activePlayerId) === String(user?._id);
+  const isExplainingPhase = matchState === 'explaining';
+  const activePlayerName = store.participants.find(
+    (p) => String(p.userId) === String(activePlayerId)
+  )?.username || 'Player';
+
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200 antialiased overflow-hidden relative">
-      <RoomHeader 
+      <RoomHeader
         user={user}
         viewMode={viewMode}
         onViewChange={setViewMode}
@@ -209,10 +246,12 @@ export default function RoomPage() {
         chatOpen={chatOpen}
         onLeave={handleLeave}
         socket={socket}
+        isActivePlayer={isActivePlayer}
+        isExplainingPhase={isExplainingPhase}
       />
 
       <div className="flex-1 flex relative bg-slate-950 w-full overflow-hidden p-2 gap-2">
-        <SidebarManager 
+        <SidebarManager
           questionPanelOpen={questionPanelOpen}
           chatOpen={chatOpen}
           setChatOpen={setChatOpen}
@@ -222,17 +261,27 @@ export default function RoomPage() {
           onSendMessage={handleSendMessage}
           user={user}
         />
-        <WorkspaceLayout 
+        <WorkspaceLayout
           viewMode={viewMode}
           user={user}
           socket={socket}
         />
       </div>
 
+      {matchState === 'judging' && String(activePlayerId) !== String(user?._id) && (
+        <JudgingOverlay
+          roomId={roomCode}
+          activePlayerId={activePlayerId}
+          activePlayerName={activePlayerName}
+          participants={store.participants}
+          myUserId={user?._id}
+        />
+      )}
+
       {arenaSummary && (
-        <ArenaLeaderboard 
-          summaryData={arenaSummary} 
-          onLeave={handleLeave} 
+        <ArenaLeaderboard
+          summaryData={arenaSummary}
+          onLeave={handleLeave}
         />
       )}
     </div>

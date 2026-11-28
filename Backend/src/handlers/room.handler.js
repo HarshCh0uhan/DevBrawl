@@ -1,6 +1,5 @@
 import { createRoomInternal, joinRoomInternal } from "../controllers/room.controller.js";
 import { Room } from "../models/room.model.js";
-import { advanceTurn } from "../utils/socket.js";
 import { cancelPendingLeave, hasLiveSocket, removeUserFromRoom } from "../utils/presence.js";
 
 const toClientRoom = (room) => {
@@ -143,79 +142,6 @@ export const registerRoomHandlers = (io, socket) => {
       io.to(inviteCode).emit("room-started", { inviteCode });
       console.log(`🚀 Room session launched and LOCKED: ${inviteCode}`);
     } catch (err) {
-      callback?.({ success: false, error: err.message });
-    }
-  });
-
-  socket.on("start-turn", async (payload, callback) => {
-    try {
-      if (!payload || !payload.inviteCode) {
-        return callback?.({ success: false, error: "Missing inviteCode parameters" });
-      }
-
-      const code = payload.inviteCode.toUpperCase();
-      const room = await Room.findOne({ inviteCode: code });
-      if (!room) return callback?.({ success: false, error: "Room not found" });
-
-      if (!room.hostId || !socket.user || room.hostId.toString() !== socket.user._id.toString()) {
-        return callback?.({ success: false, error: "Only the host can start turns" });
-      }
-
-      if (!room.participants || room.participants.length === 0) {
-        return callback?.({ success: false, error: "No participants have entered this brawl arena yet" });
-      }
-
-      const turnIdx = room.currentTurnIndex || 0;
-      if (turnIdx >= room.participants.length) {
-        return callback?.({ success: false, error: "All players have already gone this round" });
-      }
-
-      const activePart = room.participants[turnIdx];
-      if (!activePart || (!activePart.userId && !activePart._id)) {
-        return callback?.({ success: false, error: "Active coder metadata slot is corrupt or missing" });
-      }
-
-      const targetUserId = activePart.userId ? activePart.userId : activePart._id;
-
-      room.gameStatus = "turn_active";
-      room.activePlayerId = targetUserId;
-      await room.save();
-
-      io.to(code).emit("turn-started", {
-        activePlayerId: targetUserId.toString(),
-        activeUsername: activePart.username || "Anonymous Brawler",
-        turnIndex: turnIdx,
-        totalPlayers: room.participants.length,
-      });
-
-      console.log(`🎯 Turn started: ${activePart.username} in room ${code}`);
-      callback?.({ success: true });
-    } catch (err) {
-      console.error("❌ start-turn error:", err.message);
-      callback?.({ success: false, error: err.message });
-    }
-  });
-
-  socket.on("skip-turn", async (payload, callback) => {
-    try {
-      const code = payload.inviteCode.toUpperCase();
-      const room = await Room.findOne({ inviteCode: code });
-
-      if (!room) return callback?.({ success: false, error: "Room not found" });
-      if (room.hostId.toString() !== socket.user._id.toString()) {
-        return callback?.({ success: false, error: "Only the host can skip turns" });
-      }
-
-      const skippedPlayer = room.participants[room.currentTurnIndex];
-      io.to(code).emit("turn-skipped", {
-        skippedPlayerId: skippedPlayer?.userId.toString(),
-        skippedUsername: skippedPlayer?.username,
-      });
-
-      await advanceTurn(code);
-      callback?.({ success: true });
-    } catch (err) {
-      console.error("❌ skip-turn error:", err.message);
       callback?.({ success: false, error: err.message });
     }
   });
