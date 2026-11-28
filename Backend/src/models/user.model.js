@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema(
         role: { type: String, enum: ["ADMIN", "STUDENT"], default: "STUDENT" },
         phoneNumber: { type: String, required: true, trim: true },
         brawlPoints: { type: Number, default: 0, min: 0 },
+        ownedItems: { type: [String], default: [] },
+        activeAvatar: { type: String, default: 'default' },
     },
     { timestamps: true }
 );

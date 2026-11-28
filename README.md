@@ -251,6 +251,13 @@ DevBrawl/
 // Backend/src/controllers/room.controller.js + room.handler.js
 ```
 
+### 11. Brawl-Points Shop and Player Profiles
+```javascript
+// Players can view their profile and spend Brawl-Points on cosmetic avatars.
+// Purchased avatars can be equipped; account balance and inventory persist.
+// Backend/src/controllers/shop.controller.js + Frontend/src/pages/{ProfilePage,ShopPage}.jsx
+```
+
 ---
 
 ## 🔌 API Endpoints
@@ -265,6 +272,9 @@ auth login are public entry points; refresh/logout use the refresh-token cookie.
 | `POST` | `/api/v1/users/login` | Login, returns JWT |
 | `GET` | `/api/v1/users/me` | Current user (auth) |
 | `GET` | `/api/v1/users/leaderboard` | Top 100 players by Brawl-Points (auth) |
+| `GET` | `/api/v1/shop` | List cosmetic shop items (auth) |
+| `POST` | `/api/v1/shop/buy/:itemId` | Purchase an item with Brawl-Points (auth) |
+| `POST` | `/api/v1/shop/equip/:itemId` | Equip an owned avatar (auth) |
 | `POST` | `/api/v1/auth/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/auth/login` | Login and set HttpOnly refresh cookie |
 | `POST` | `/api/v1/auth/refresh` | Rotate refresh cookie and return access token |
