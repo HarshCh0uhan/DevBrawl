@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [isJoining, setIsJoining] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [roomPassword, setRoomPassword] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
 
   // Ensure Socket Handshake is Authenticated on Component Mount
   useEffect(() => {
@@ -68,9 +71,17 @@ export default function Dashboard() {
   // --- HANDLERS ---
   const handleCreateRoom = () => {
     setCreateError('');
+    if (isPrivate && !roomPassword) {
+      setCreateError('Enter a password for this private room');
+      return;
+    }
     setIsCreating(true);
 
-    socket.emit("create-room", { name: `${user?.username}'s Session`}, (res) => {
+    socket.emit("create-room", {
+      name: `${user?.username}'s Session`,
+      isPrivate,
+      password: roomPassword,
+    }, (res) => {
       setIsCreating(false);
       if (res?.success) {
         setRoom(res.data);
@@ -92,7 +103,10 @@ export default function Dashboard() {
     }
 
     setIsJoining(true);
-    socket.emit("join-room", { inviteCode: inviteCode.trim().toUpperCase() }, (res) => {
+    socket.emit("join-room", {
+      inviteCode: inviteCode.trim().toUpperCase(),
+      password: joinPassword,
+    }, (res) => {
       setIsJoining(false);
       if (res?.success) {
         // Stay in dashboard lobby mode, sync participant view metrics
@@ -100,7 +114,11 @@ export default function Dashboard() {
         setParticipants(res.data.participants);
         setMatchState(res.data.matchState || 'waiting');
       } else {
-        setJoinError(res?.error || 'Active room node not found');
+        setJoinError(
+          res?.error === "ROOM_PASSWORD_REQUIRED"
+            ? "This room is private. Please enter the password."
+            : res?.error || 'Active room node not found'
+        );
       }
     });
   };
@@ -359,6 +377,28 @@ export default function Dashboard() {
                 {createError && <p className="mb-3 text-xs text-red-400 font-mono">ERR: {createError}</p>}
               </div>
 
+              <div className="mb-4">
+                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPrivate}
+                    onChange={(e) => setIsPrivate(e.target.checked)}
+                    className="rounded bg-slate-900 border-slate-700"
+                  />
+                  Make Room Private (Require Password)
+                </label>
+                {isPrivate && (
+                  <input
+                    type="password"
+                    placeholder="Enter room password"
+                    value={roomPassword}
+                    onChange={(e) => setRoomPassword(e.target.value)}
+                    required
+                    className="mt-2 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                  />
+                )}
+              </div>
+
               <button
                 onClick={handleCreateRoom}
                 disabled={isCreating}
@@ -386,6 +426,13 @@ export default function Dashboard() {
                   placeholder="INPUT_INVITE_TOKEN"
                   maxLength={6}
                   className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-left text-sm font-mono font-bold tracking-widest text-slate-100 placeholder-slate-600 outline-none focus:border-blue-500 uppercase"
+                />
+                <input
+                  type="password"
+                  placeholder="Password (if private)"
+                  value={joinPassword}
+                  onChange={(e) => setJoinPassword(e.target.value)}
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white mb-2"
                 />
                 <button
                   type="submit"

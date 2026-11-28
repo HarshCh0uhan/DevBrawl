@@ -36,6 +36,8 @@ const roomSchema = new mongoose.Schema({
   code:            { type: String, default: "" },
   isActive:        { type: Boolean, default: true },
   isPublic:        { type: Boolean, default: false },
+  isPrivate:       { type: Boolean, default: false },
+  password:        { type: String, default: null, select: false },
 
   // Turn & Judging State
   currentRound: { type: Number, default: 1 },
