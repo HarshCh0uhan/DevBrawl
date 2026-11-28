@@ -8,6 +8,7 @@ import { registerRoomHandlers } from "../handlers/room.handler.js";
 import { registerSyncHandlers } from "../handlers/canvasSync.handler.js";
 import { registerQuestionHandlers } from "../handlers/question.handler.js";
 import { registerGameHandlers } from "../handlers/game.handler.js";
+import { registerMatchmakingHandlers } from "../handlers/matchmaking.handler.js";
 
 let _io = null;
 export const getIO = () => _io;
@@ -48,6 +49,7 @@ export const initializeSocket = (httpServer) => {
     registerSyncHandlers(io, socket);
     registerQuestionHandlers(io, socket);
     registerGameHandlers(io, socket);
+    registerMatchmakingHandlers(io, socket);
 
     // ── Disconnect ──────────────────────────────────────────────────────
     socket.on("disconnect", () => {

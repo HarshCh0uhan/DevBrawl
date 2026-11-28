@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Ensure Socket Handshake is Authenticated on Component Mount
@@ -100,6 +101,16 @@ export default function Dashboard() {
         setMatchState(res.data.matchState || 'waiting');
       } else {
         setJoinError(res?.error || 'Active room node not found');
+      }
+    });
+  };
+
+  const handleFindPublicMatch = () => {
+    setIsSearching(true);
+    socket.emit("join-public-queue", {}, (res) => {
+      if (!res?.success) {
+        alert(res?.error || "Could not join public matchmaking");
+        setIsSearching(false);
       }
     });
   };
@@ -329,6 +340,16 @@ export default function Dashboard() {
         ) : (
 
           /* ─── INITIAL CREATION OR INTERCEPT SPLIT CARDS ─── */
+          <>
+          <div className="w-full max-w-2xl mx-auto mb-6">
+            <button
+              onClick={handleFindPublicMatch}
+              disabled={isSearching}
+              className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 py-4 text-sm font-black text-white tracking-widest uppercase transition shadow-lg active:scale-95 disabled:opacity-60"
+            >
+              ⚔️ Find Public Match
+            </button>
+          </div>
           <div className="grid gap-6 md:grid-cols-2">
             {/* Create Room Box */}
             <div className="rounded border border-slate-800 bg-slate-900 p-6 flex flex-col justify-between text-left">
@@ -378,8 +399,23 @@ export default function Dashboard() {
               </form>
             </div>
           </div>
+          </>
         )}
       </main>
+      {isSearching && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md">
+          <div className="h-12 w-12 rounded-full border-4 border-slate-700 border-t-indigo-500 animate-spin mb-4" />
+          <h2 className="text-xl font-black text-indigo-400 uppercase tracking-widest animate-pulse">
+            Searching for Brawlers...
+          </h2>
+          <button
+            onClick={() => setIsSearching(false)}
+            className="mt-8 text-xs text-slate-500 hover:text-white underline cursor-pointer"
+          >
+            Cancel Search
+          </button>
+        </div>
+      )}
     </div>
   );
 }

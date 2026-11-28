@@ -237,6 +237,13 @@ DevBrawl/
 // Files: Frontend/src/store/authStore.js, Frontend/src/utils/axios.js
 ```
 
+### 9. Public Matchmaking
+```javascript
+// Dashboard users can join or create a public room via join-public-queue.
+// Public rooms automatically start when settings.maxPlayers is reached.
+// Backend/src/handlers/matchmaking.handler.js
+```
+
 ---
 
 ## 🔌 API Endpoints
@@ -250,6 +257,7 @@ auth login are public entry points; refresh/logout use the refresh-token cookie.
 | `POST` | `/api/v1/users/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/users/login` | Login, returns JWT |
 | `GET` | `/api/v1/users/me` | Current user (auth) |
+| `GET` | `/api/v1/users/leaderboard` | Top 100 players by Brawl-Points (auth) |
 | `POST` | `/api/v1/auth/register` | Register (multipart avatar optional) |
 | `POST` | `/api/v1/auth/login` | Login and set HttpOnly refresh cookie |
 | `POST` | `/api/v1/auth/refresh` | Rotate refresh cookie and return access token |
@@ -261,6 +269,9 @@ auth login are public entry points; refresh/logout use the refresh-token cookie.
 | `POST` | `/api/v1/submissions/submit` | Submit against test cases (auth) |
 | `POST` | `/api/v1/questions/generate` | Generate a round question (auth) |
 | `GET` | `/api/v1/questions/:roomId/:roundNumber` | Fetch an existing question (auth) |
+
+The authenticated Socket.IO event `join-public-queue` joins an available public
+room or creates one; the room auto-starts at capacity.
 
 ---
 
