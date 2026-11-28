@@ -47,6 +47,7 @@ const roomSchema = new mongoose.Schema({
   currentJudgingScores: { type: mongoose.Schema.Types.Mixed, default: {} },
 
   lastSummary:       { type: mongoose.Schema.Types.Mixed, default: null },
+  pointsAwarded:     { type: Boolean, default: false },
 
 }, { timestamps: true });
 

@@ -121,7 +121,9 @@ const checkAndTriggerFinalLeaderboard = async (roomId) => {
 
     const room = await Room.findOne({ inviteCode: normalizedRoomId });
 
-    if (room && room.matchState === "finished") {
+    // A summary already exists: the match-end pass (or a previous late
+    // submission) already awarded points and broadcast the recap.
+    if (room && room.matchState === "finished" && !room.lastSummary) {
 
       // Pass the normalized uppercase room string to prevent channel scattering
       await compileAndBroadcastLeaderboard(ioInstance, normalizedRoomId);

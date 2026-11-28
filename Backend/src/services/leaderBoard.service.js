@@ -1,23 +1,7 @@
+import { Room } from "../models/room.model.js";
+import { User } from "../models/user.model.js";
 import { generateText as groqGenerateText, isGroqAvailable } from "../utils/groq.js";
 import { generateText as openrouterGenerateText, isOpenRouterAvailable } from "../utils/openrouter.js";
-import { Submission } from "../models/submission.model.js";
-import { Room } from "../models/room.model.js";
-
-// Emits the summary to the room and stores a copy on the Room so late/reconnecting
-// players can still get it. sourceCode is dropped from the stored copy (the score
-// screen doesn't show it and it would bloat the room document).
-const publishSummary = async (io, roomId, summary) => {
-  io.to(roomId).emit("match-summary-ready", summary);
-  try {
-    const stored = {
-      ...summary,
-      leaderboard: summary.leaderboard.map(({ sourceCode, ...rest }) => rest),
-    };
-    await Room.updateOne({ inviteCode: roomId }, { $set: { lastSummary: stored } });
-  } catch (err) {
-    console.warn(`⚠️ Could not persist match summary for ${roomId}: ${err.message}`);
-  }
-};
 
 const generateCommentary = async (prompt) => {
   if (isGroqAvailable()) {
@@ -36,7 +20,7 @@ const generateCommentary = async (prompt) => {
 
   if (isOpenRouterAvailable()) {
     try {
-      console.log("🔮 Generating match commentary with OpenRouter (Nemotron)...");
+      console.log("🔮 Generating match commentary with OpenRouter...");
       return await openrouterGenerateText({
         systemPrompt: "You are an elite, sarcastic, and competitive esports coding commentator for a platform called DevBrawl.",
         userPrompt: prompt,
@@ -51,65 +35,84 @@ const generateCommentary = async (prompt) => {
   throw new Error("No AI provider available for commentary");
 };
 
+const publishSummary = async (io, roomId, summary) => {
+  io.to(roomId).emit("match-summary-ready", summary);
+  // Persisted so a player who refreshes after the match still receives the
+  // recap on rejoin (join-room replays Room.lastSummary).
+  try {
+    await Room.updateOne({ inviteCode: roomId }, { $set: { lastSummary: summary } });
+  } catch (err) {
+    console.warn(`⚠️ Could not persist match summary for ${roomId}: ${err.message}`);
+  }
+};
+
 export const compileAndBroadcastLeaderboard = async (io, roomId) => {
   const formattedRoomId = roomId.toUpperCase();
 
   try {
-    // 1. Aggregate best score per player
-    const leaderboard = await Submission.aggregate([
-      { $match: { roomId: formattedRoomId } },
-      { $sort: { finalScore: -1 } },
-      {
-        $group: {
-          _id: "$userId",
-          username: { $first: "$username" },
-          finalScore: { $first: "$finalScore" },
-          testsPassed: { $first: "$testsPassed" },
-          testsTotal: { $first: "$testsTotal" },
-          sourceCode: { $first: "$sourceCode" }
-        }
-      },
-      { $sort: { finalScore: -1 } }
-    ]);
+    // Claim the one-time brawlPoints award. Late Phase-2 AI grading calls this
+    // function again after the match ends, so the credit must be idempotent.
+    const claimed = await Room.findOneAndUpdate(
+      { inviteCode: formattedRoomId, pointsAwarded: { $ne: true } },
+      { $set: { pointsAwarded: true } },
+      { returnDocument: "after" }
+    );
+    const room = claimed || await Room.findOne({ inviteCode: formattedRoomId });
+
+    if (!room) {
+      console.error(`❌ Room ${formattedRoomId} not found for leaderboard.`);
+      return;
+    }
+
+    // 1. Build leaderboard from participants
+    const leaderboard = room.participants
+      .map(p => ({
+        _id: p.userId.toString(),
+        username: p.username,
+        totalMatchScore: p.totalMatchScore,
+      }))
+      .sort((a, b) => b.totalMatchScore - a.totalMatchScore);
 
     if (leaderboard.length === 0) {
       await publishSummary(io, formattedRoomId, {
         leaderboard: [],
-        feedback: "The arena closed silently. No submissions were logged.",
+        feedback: "The arena closed silently. No scores were logged.",
         winnerId: null,
         winnerName: null
       });
       return;
     }
 
-    // 2. Try AI commentary — never let it block the leaderboard emit
-    let roomFeedback = "Match concluded. Scores compiled from available submissions.";
-
-    try {
-      const codesSummary = leaderboard
-        .map(p => `Player ${p.username}:\n\`\`\`\n${p.sourceCode}\n\`\`\``)
-        .join("\n\n");
-
-      const aiPrompt = `Review the following solutions submitted by players in Room ${formattedRoomId}:
-${codesSummary}
-
-Provide a short, punchy, 3-sentence tactical feedback report summarizing who had the most elegant approach, who wrote brute-force spaghetti code, and a brief tip on optimization. Keep the tone gaming-centric, punchy, and fun!`;
-
-      const commentary = await generateCommentary(aiPrompt);
-      if (commentary) {
-        roomFeedback = commentary;
-        console.log(`✅ AI commentary generated for room ${formattedRoomId}`);
+    // 2. Award Brawl-Points globally
+    // We use $inc to atomically add points to the User's account
+    if (claimed) {
+      for (const player of leaderboard) {
+        if (player.totalMatchScore > 0) {
+          await User.findByIdAndUpdate(player._id, {
+            $inc: { brawlPoints: player.totalMatchScore }
+          });
+        }
       }
-    } catch (aiErr) {
-      console.warn(`⚠️ AI commentary skipped for room ${formattedRoomId}: ${aiErr.message}`);
-      roomFeedback = "AI commentator is offline right now — but the scores speak for themselves!";
     }
 
-    // 3. Always emit regardless of whether AI succeeded or failed
+    // 3. AI Commentary
+    let roomFeedback = "Match concluded. Scores compiled.";
+    try {
+      const summaryText = leaderboard.map(p => `${p.username}: ${p.totalMatchScore} pts`).join(", ");
+      const aiPrompt = `The match in Room ${formattedRoomId} has ended. Final scores: ${summaryText}. Provide a short, punchy, 3-sentence tactical feedback report. Keep the tone gaming-centric and fun!`;
+
+      const commentary = await generateCommentary(aiPrompt);
+      if (commentary) roomFeedback = commentary;
+    } catch (aiErr) {
+      console.warn(`⚠️ AI commentary skipped: ${aiErr.message}`);
+      roomFeedback = "AI commentator is offline, but the scores speak for themselves!";
+    }
+
+    // 4. Broadcast the summary
     await publishSummary(io, formattedRoomId, {
       leaderboard,
       feedback: roomFeedback,
-      winnerId: leaderboard[0]._id.toString(),
+      winnerId: leaderboard[0]._id,
       winnerName: leaderboard[0].username
     });
 
@@ -119,7 +122,7 @@ Provide a short, punchy, 3-sentence tactical feedback report summarizing who had
     console.error("❌ Failed to compile leaderboard:", err.message);
     io.to(formattedRoomId).emit("match-summary-ready", {
       leaderboard: [],
-      feedback: "Score compilation encountered an error. Please check with the host.",
+      feedback: "Score compilation encountered an error.",
       winnerId: null,
       winnerName: null
     });
