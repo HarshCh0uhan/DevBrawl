@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // ──────────────────────────────────────────────────────────────────────────────
 // DevBrawl - OneCompiler Regression Test
-// Run: npm run test:executor  (or: node test-onecompiler.js)
+// Run: npm run test:executor  (or: node scripts/test-onecompiler.js)
 // ──────────────────────────────────────────────────────────────────────────────
 
 import 'dotenv/config';
-import { executeCode, executeAgainstTestCases } from './src/utils/oneCompilerExecutor.js';
+import { executeCode, executeAgainstTestCases } from '../src/utils/oneCompilerExecutor.js';
 
 const TEST_CODE = {
   63: `// JavaScript\nconsole.log(1 + 1);`,

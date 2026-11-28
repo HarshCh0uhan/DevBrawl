@@ -2,7 +2,7 @@
 // Test OpenRouter with Nemotron 3 Ultra
 
 import 'dotenv/config';
-import { generateStructuredJSON, isOpenRouterAvailable, listAvailableModels } from '../Backend/src/utils/openrouter.js';
+import { generateStructuredJSON, isOpenRouterAvailable, listAvailableModels } from '../src/utils/openrouter.js';
 
 async function testOpenRouter() {
   console.log('🔮 Testing OpenRouter (Nemotron 3 Ultra)...\n');

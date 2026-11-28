@@ -3,19 +3,9 @@
 > **This file is the source of truth for how AI assistants must work on this project.**
 > Read this before EVERY task. No exceptions.
 
----
-
 ## 🎯 Core Mission
-
-Build DevBrawl — a free, real-time collaborative coding interview platform.
-**Every decision must optimize for: FREE tier, simplicity, reliability.**
-
-This is a **local-only project**. There is no production deployment and no
-Oracle Cloud infrastructure. Code execution runs through **OneCompiler via
-RapidAPI** (free tier, hard cap of 1,000 requests/month). MongoDB is either
-MongoDB Atlas M0 or a native local install. No container runtime is required.
-
----
+Build **DevBrawl** — a competitive, turn-based real-time multiplayer coding arena.
+**Every decision must optimize for: competitive integrity, real-time responsiveness, and free-tier infrastructure.**
 
 ## 🔄 Git Workflow (MANDATORY)
 
@@ -51,8 +41,6 @@ gh pr merge --merge --delete-branch
 git checkout main && git pull && git branch -d feature/descriptive-name
 ```
 
----
-
 ## 🧠 Agent Rules (NON-NEGOTIABLE)
 
 ### Before ANY code change:
@@ -76,91 +64,54 @@ git checkout main && git pull && git branch -d feature/descriptive-name
 - Update AGENTS.md if workflow changes
 - Use `gh pr create` and `gh pr merge`
 
----
-
 ## 🏗️ Project Architecture
 
 ```
 Frontend (React + Vite)        Backend (Node.js + Express)
-├── Monaco Editor              ├── Socket.io (real-time)
-├── Excalidraw Canvas          ├── Mongoose (MongoDB Atlas/local)
-├── Socket.io Client           ├── OneCompiler via RapidAPI (code exec)
-└── Zustand Store              └── AI Services (Gemini/Groq/OpenRouter)
+├── Monaco Editor              ├── Socket.io (Real-time state machine)
+├── Excalidraw Canvas          ├── Mongoose (MongoDB Atlas)
+├── Socket.io Client           ├── OneCompiler via RapidAPI (Code exec)
+├── LiveKit Client (Voice)     ├── LiveKit Server (Voice rooms)
+└── Zustand Store              └── AI Services (Groq/OpenRouter for commentary)
 ```
 
-Code execution is **OneCompiler via RapidAPI** only. There is no local
-container execution and no self-hosted execution engine. Every test case in a
-submission costs one RapidAPI request.
-
----
+### The Game Loop (State Machine)
+1. `waiting`: Lobby phase. Players ready up. Host configures settings.
+2. `coding`: Active player writes code. Server locks room to new spectators.
+3. `explaining`: Active player's mic auto-unmutes via LiveKit.
+4. `judging`: Other players distribute 100 points from their Judging Pool.
+5. `finished`: Points tallied, Brawl-Points awarded, leaderboard shown.
 
 ## 💰 Current Stack
-
 | Service | Tier | Purpose |
 |---------|------|---------|
-| MongoDB Atlas | M0 (512MB) or native local | Database |
-| OneCompiler (RapidAPI) | Free: 1,000 req/month (hard cap) | Code execution |
-| Gemini | 1,500 req/day | Primary AI |
-| Groq | 14,400 req/day | Fallback AI |
-| OpenRouter | Free (Nemotron) | Backup AI |
+| MongoDB Atlas | M0 (512MB) | Database |
+| OneCompiler (RapidAPI) | Free: 1,000 req/month | Code execution |
+| Groq / OpenRouter | Free | AI Match Commentary |
 | LiveKit | 10K min/mo | Voice/Video |
-| Cloudinary | 25GB storage | Image uploads |
-| Node.js 20 LTS | Free | Backend runtime |
-| React + Vite | Free | Frontend |
-
----
+| Render | Free | Backend Hosting |
+| Vercel | Free | Frontend Hosting |
 
 ## 🔑 Key Files
-
 | File | Purpose |
 |------|---------|
-| `Backend/src/services/aiQuestionGenerator.js` | AI question generation (3 providers) |
-| `Backend/src/services/aiScoringService.js` | AI code scoring (3 providers) |
-| `Backend/src/utils/oneCompilerExecutor.js` | Code execution via RapidAPI (LIVE) |
-| `Backend/src/controllers/codeWrapper.js` | Java/C++ boilerplate wrapper |
-| `Backend/src/controllers/code.controller.js` | Run Code endpoint |
-| `Backend/src/controllers/submission.controller.js` | Submit/judge endpoint |
-| `Backend/src/utils/groq.js` | Groq client (fallback models) |
-| `Backend/src/utils/openrouter.js` | OpenRouter client (Nemotron) |
-| `Frontend/src/store/authStore.js` | JWT auth + auto-refresh |
-| `README.md` | Project docs |
+| `Backend/src/handlers/game.handler.js` | Core game loop state machine (judging, scoring, turn advancement) |
+| `Backend/src/handlers/matchmaking.handler.js` | Public matchmaking queue logic |
+| `Backend/src/handlers/room.handler.js` | Lobby, ready checks, security locks |
+| `Backend/src/utils/oneCompilerExecutor.js` | Code execution via RapidAPI |
+| `Frontend/src/components/JudgingOverlay.jsx` | The 100-point judging pool UI |
+| `Frontend/src/pages/GlobalLeaderboard.jsx` | Hall of Fame |
+| `Frontend/src/pages/ShopPage.jsx` | Brawl-Points cosmetics store |
 | `AGENTS.md` | This file |
 
----
-
-## 🧪 Testing Commands
-
-```bash
-# OneCompiler live executor regression test
-cd Backend && npm run test:executor
-
-# Frontend build
-cd Frontend && npm run build
-
-# Backend AI smoke test
-cd Backend && node -e "
-require('dotenv').config();
-process.env.AI_PROVIDER='openrouter';
-import('./src/services/aiQuestionGenerator.js').then(m =>
-  m.generateQuestion('arrays', 'easy').then(console.log).catch(console.error)
-);"
-```
-
----
-
 ## 🚨 Common Pitfalls
-
 | Pitfall | Solution |
 |---------|----------|
-| RAPIDAPI quota exhausted (1,000/mo) | Free tier is hard-capped — switch to paid tier or reduce test cases per submission |
-| RAPIDAPI_KEY / RAPIDAPI_HOST missing | Check `Backend/.env`; the health endpoint will report degraded |
-| OneCompiler returns empty | `.env` keys stale; re-issue at https://rapidapi.com/onecompiler |
-| OneCompiler execution times out | The sandbox has an approximately 5-second runtime limit; optimize submitted code or reduce work per test case |
-| Mongo validation error | Check required fields in returned object |
-| Server runs old code | `taskkill /F /PID <pid>` then `npm run dev` |
-| AI returns empty | Model doesn't support JSON mode → fallback to non-JSON |
-
----
+| Match gets stuck in "judging" | Check if all judges submitted scores. If a judge disconnects, their score is forfeited. |
+| Private room password fails | Ensure `bcrypt.compare` is used. The `password` field has `select: false`, so `Room.findOne().select('+password')` is required. |
+| Spectators joining active match | The `join-room` handler checks `matchState !== "waiting"` and blocks non-participants. |
+| Brawl-Points double crediting | Leaderboard compilation uses an idempotent guard. Do not remove it. |
+| LiveKit mic is muted | The `VoiceCall.jsx` relies on `isExplainingPhase` and `isActivePlayer` props to auto-mute/unmute. |
 
 ## 📝 Commit Message Format
 
@@ -175,15 +126,7 @@ chore: maintenance
 
 Example: `fix: OpenRouter topic normalization - pass topic/difficulty as fallback`
 
----
-
 ## 🎯 Remember
-
 > **The best code is code that doesn't need to be written.**
 > 
 > Read first. Think second. Code third. Test always.
-
----
-
-*Last updated: 2026-11-25*
-*Workflow established after repeated hallucination failures - learn from history.*
