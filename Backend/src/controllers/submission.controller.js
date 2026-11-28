@@ -9,7 +9,6 @@ import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { queuePhase2Scoring } from "../services/aiScoringQueue.js";
-import { advanceTurn } from "../utils/socket.js";
 
 const buildTestResult = (testCaseIndex, result, expectedOutput, timeLimitMs) => {
   if (result.compilationFailed) {
@@ -117,12 +116,9 @@ export const submitSolution = asyncHandler(async (req, res) => {
     }, allPassed ? "All test cases passed!" : "Some test cases failed")
   );
 
-  // ── Advance turn with normalized casing strings ──────────────
-  if (normalizedRoomId) {
-    advanceTurn(normalizedRoomId).catch((err) => {
-      console.error(`❌ advanceTurn failed for room ${normalizedRoomId}:`, err.message);
-    });
-  }
+  // Turn advancement is owned by the Phase 12 judging engine
+  // (submit-code-turn -> explaining -> judging -> tally). Advancing here would
+  // move activePlayerId before the engine reads this submission's score.
 
   // Phase 2 AI scoring queue initialization
   queuePhase2Scoring(submission._id).catch((err) => {

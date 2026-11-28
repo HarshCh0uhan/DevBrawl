@@ -7,6 +7,8 @@ const participantSchema = new mongoose.Schema({
   joinedAt: { type: Date, default: Date.now },
   isReady:  { type: Boolean, default: false },
   isConnected: { type: Boolean, default: true },
+  totalMatchScore: { type: Number, default: 0 },
+  currentRoundScore: { type: Number, default: 0 },
 });
 
 const roomSchema = new mongoose.Schema({
@@ -25,15 +27,25 @@ const roomSchema = new mongoose.Schema({
     maxPlayers: { type: Number, default: 4 }
   },
 
-  matchState: { type: String, enum: ["waiting", "in_progress", "finished"], default: "waiting" },
+  // Game State Machine
+  matchState: {
+    type: String,
+    enum: ["waiting", "coding", "explaining", "judging", "finished"],
+    default: "waiting"
+  },
   code:            { type: String, default: "" },
   isActive:        { type: Boolean, default: true },
 
-  // Game state
+  // Turn & Judging State
   currentRound: { type: Number, default: 1 },
-  gameStatus:        { type: String, enum: ["waiting", "turn_active", "all_done"], default: "waiting" },
   currentTurnIndex:  { type: Number, default: 0 },
   activePlayerId:    { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  activePlayerAiScore: { type: Number, default: 0 },
+
+  // Judging Data (resets every turn)
+  // Stores: { "judgeUserId": { "targetUserId": pointsAllocated } }
+  currentJudgingScores: { type: mongoose.Schema.Types.Mixed, default: {} },
+
   lastSummary:       { type: mongoose.Schema.Types.Mixed, default: null },
 
 }, { timestamps: true });
