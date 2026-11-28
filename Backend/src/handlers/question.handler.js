@@ -1,5 +1,3 @@
-//ai question generator 
-
 import { generateQuestion } from "../services/aiQuestionGenerator.js";
 import { Question } from "../models/question.model.js";
 
@@ -36,7 +34,7 @@ const generateAndBroadcastQuestion = async (io, roomId, roundNumber, topic, diff
 };
 
 export const registerQuestionHandlers = (io, socket) => {
-  
+
   socket.on("start-round", async (payload) => {
     const { inviteCode, roundNumber, topic, difficulty } = payload;
     if (!inviteCode || !roundNumber || !topic) {
@@ -48,14 +46,5 @@ export const registerQuestionHandlers = (io, socket) => {
     await generateAndBroadcastQuestion(io, roomId, roundNumber, topic, difficulty);
   });
 
-  socket.on("regenerate-round-question", async (payload) => {
-    const { inviteCode, roundNumber, topic, difficulty } = payload;
-    if (!inviteCode || !roundNumber || !topic) {
-      socket.emit("round-question-failed", { error: "inviteCode, roundNumber and topic are required" });
-      return;
-    }
-    const roomId = inviteCode.toUpperCase();
-    io.to(roomId).emit("round-question-regenerating", { roomId, roundNumber, topic, difficulty: difficulty || "medium" });
-    await generateAndBroadcastQuestion(io, roomId, roundNumber, topic, difficulty);
-  });
+  // Removed regenerate-round-question handler completely.
 };

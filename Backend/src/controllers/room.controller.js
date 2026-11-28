@@ -13,10 +13,10 @@ const createRoomInternal = async (payload, user) => {
     const room = await Room.create({
         name: name || `Room-${user.username}`,
         hostId: user._id,
-        // language: language || "javascript",
-        maxParticipants: maxParticipants || 8,
+        settings: { maxPlayers: maxParticipants || 4 },
         code: "",
-        participants: [{ userId: user._id, username: user.username }],
+        // The host is implicitly ready; otherwise nobody could ever start.
+        participants: [{ userId: user._id, username: user.username, isReady: true }],
     });
 
     return room;
@@ -28,9 +28,9 @@ const joinRoomInternal = async (payload, user) => {
     if (!inviteCode) throw new ApiError(400, "Invitation code is required");
     if (!user?._id) throw new ApiError(401, "Authentication failed");
 
-    const room = await Room.findOne({ 
-        inviteCode: inviteCode.trim().toUpperCase(), 
-        isActive: true 
+    const room = await Room.findOne({
+        inviteCode: inviteCode.trim().toUpperCase(),
+        isActive: true
     });
 
     if (!room) throw new ApiError(404, "Room not found or deactivated");
@@ -43,7 +43,8 @@ const joinRoomInternal = async (payload, user) => {
 
     if (isAlreadyInside) return room;
 
-    if (room.participants.length >= room.maxParticipants) {
+    const maxPlayers = room.settings?.maxPlayers ?? 4;
+    if (room.participants.length >= maxPlayers) {
         throw new ApiError(400, "Room is full");
     }
 
@@ -74,9 +75,9 @@ export const generateLiveKitToken = async (roomName, username) => {
         env.livekitApiSecret,
         { identity: username }
     )
-    
-    token.addGrant({ 
-        roomJoin: true, 
+
+    token.addGrant({
+        roomJoin: true,
         room: roomName,
         canPublish: true,
         canSubscribe: true,
