@@ -36,6 +36,9 @@ export const login = asyncHandler(async (req, res) => {
       username: user.username,
       email: user.email,
       avatar: user.avatar || null,
+      brawlPoints: user.brawlPoints || 0,
+      ownedItems: user.ownedItems || [],
+      activeAvatar: user.activeAvatar || 'default',
     },
     accessToken,
   }, 'Logged in'))
@@ -75,5 +78,15 @@ export const logout = asyncHandler(async (req, res) => {
 })
 
 export const me = asyncHandler(async (req, res) => {
-  res.status(200).json(new ApiResponse(200, { user: req.user }, 'OK'))
+  res.status(200).json(new ApiResponse(200, {
+    user: {
+      _id: req.user._id,
+      username: req.user.username,
+      email: req.user.email,
+      avatar: req.user.avatar || null,
+      brawlPoints: req.user.brawlPoints || 0,
+      ownedItems: req.user.ownedItems || [],
+      activeAvatar: req.user.activeAvatar || 'default',
+    },
+  }, 'OK'))
 })

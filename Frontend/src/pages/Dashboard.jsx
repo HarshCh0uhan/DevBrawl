@@ -184,9 +184,14 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-xs border border-slate-800 bg-slate-950 px-2.5 py-1 rounded">
-            <span className="text-slate-500">USER:</span>
-            <span className="text-blue-400 font-semibold">{user?.username}</span>
+            <span className="text-amber-500 font-bold">🪙 {(user?.brawlPoints || 0).toLocaleString()} PTS</span>
           </div>
+          <button
+            onClick={() => navigate('/profile')}
+            className="rounded border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white cursor-pointer"
+          >
+            {user?.username}
+          </button>
           <button
             onClick={() => navigate('/leaderboard')}
             className="rounded border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-amber-900 hover:text-amber-400 hover:border-amber-900 cursor-pointer"

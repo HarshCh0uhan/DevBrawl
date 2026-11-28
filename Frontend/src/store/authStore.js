@@ -19,12 +19,22 @@ export const useAuthStore = create(
 
       setToken: (token) => set({ token, isAuthenticated: Boolean(token) }),
       setHasHydrated: (value) => set({ hasHydrated: value }),
+      setUser: (userData) => set({ user: userData }),
 
       login: async (email, password) => {
         try {
           const res = await api.post('/auth/login', { email, password })
           const { user, accessToken } = res.data.data
-          set({ user, token: accessToken, isAuthenticated: true })
+          set({
+            user: {
+              ...user,
+              brawlPoints: user.brawlPoints ?? 0,
+              ownedItems: user.ownedItems ?? [],
+              activeAvatar: user.activeAvatar ?? 'default',
+            },
+            token: accessToken,
+            isAuthenticated: true,
+          })
           if (!socket.connected) socket.connect()
           return { success: true }
         } catch (err) {
@@ -56,7 +66,15 @@ export const useAuthStore = create(
           set({ token: accessToken, isAuthenticated: true })
 
           const meRes = await api.get('/auth/me')
-          set({ user: meRes.data.data.user })
+          const user = meRes.data.data.user
+          set({
+            user: {
+              ...user,
+              brawlPoints: user.brawlPoints ?? 0,
+              ownedItems: user.ownedItems ?? [],
+              activeAvatar: user.activeAvatar ?? 'default',
+            },
+          })
           if (!socket.connected) socket.connect()
           return true
         } catch {
