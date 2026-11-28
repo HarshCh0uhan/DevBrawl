@@ -1,5 +1,6 @@
 import { Room } from "../models/room.model.js";
 import { Submission } from "../models/submission.model.js";
+import { compileAndBroadcastLeaderboard } from "../services/leaderBoard.service.js";
 
 export const registerGameHandlers = (io, socket) => {
 
@@ -155,12 +156,17 @@ export const registerGameHandlers = (io, socket) => {
     io.to(inviteCode).emit("turn-results", {
       activePlayerId: activePlayer.userId,
       activeUsername: activePlayer.username,
-      aiScore,
+      aiScore, // The score before reset
       peerScore: avgPeerScore,
       finalRoundScore,
       totalMatchScore: activePlayer.totalMatchScore,
       nextMatchState: room.matchState,
       nextActivePlayerId: room.activePlayerId
     });
+
+    // Trigger the summary if the game is over
+    if (room.matchState === "finished") {
+      await compileAndBroadcastLeaderboard(io, inviteCode);
+    }
   };
 };
