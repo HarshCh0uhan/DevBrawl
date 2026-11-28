@@ -4,7 +4,7 @@ import { AccessToken } from 'livekit-server-sdk'
 import { env } from "../config/env.js";
 
 const createRoomInternal = async (payload, user) => {
-    const { name, maxParticipants } = payload || {};
+    const { name, maxParticipants, isPublic = false } = payload || {};
 
     if (!user?._id) {
         throw new ApiError(401, "Authentication failed. User context missing.");
@@ -13,6 +13,7 @@ const createRoomInternal = async (payload, user) => {
     const room = await Room.create({
         name: name || `Room-${user.username}`,
         hostId: user._id,
+        isPublic,
         settings: { maxPlayers: maxParticipants || 4 },
         code: "",
         // The host is implicitly ready; otherwise nobody could ever start.
