@@ -40,8 +40,8 @@ export const registerRoomHandlers = (io, socket) => {
 
       if (!room) return callback?.({ success: false, error: "Room not found" });
 
-      // SECURITY LOCK: Prevent random joins during a match
-      if (room.matchState === "in_progress") {
+      // SECURITY LOCK: Prevent random joins once the match has left the lobby
+      if (room.matchState !== "waiting") {
         const existingPlayer = room.participants.find(p => p.userId.toString() === socket.user._id.toString());
         if (!existingPlayer) {
           return callback?.({ success: false, error: "Match already in progress. Spectators are not allowed." });
@@ -60,7 +60,7 @@ export const registerRoomHandlers = (io, socket) => {
         participants: updatedRoom.participants
       });
 
-      if (updatedRoom.gameStatus === "all_done" && updatedRoom.lastSummary) {
+      if (updatedRoom.matchState === "finished" && updatedRoom.lastSummary) {
         socket.emit("match-summary-ready", updatedRoom.lastSummary);
       }
 
@@ -133,8 +133,11 @@ export const registerRoomHandlers = (io, socket) => {
         return callback?.({ success: false, error: "Not all players are ready!" });
       }
 
-      // Lock the room
-      room.matchState = "in_progress";
+      // Lock the room and start
+      room.matchState = "coding";
+      room.currentTurnIndex = 0;
+      room.currentRound = 1;
+      room.activePlayerId = room.participants[0].userId;
       await room.save();
 
       io.to(inviteCode).emit("room-started", { inviteCode });
