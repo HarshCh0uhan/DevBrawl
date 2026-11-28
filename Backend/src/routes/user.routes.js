@@ -1,11 +1,18 @@
 import { Router } from "express";
-import { registerUser, loginUser, getCurrentUser } from "../controllers/user.controller.js";
+import {
+    registerUser,
+    loginUser,
+    getCurrentUser,
+    getGlobalLeaderboard,
+} from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { userAuth } from "../middlewares/auth.middleware.js";
 import { generateLiveKitToken } from "../controllers/room.controller.js";
 import { env } from "../config/env.js";
 
 const router = Router();
+
+router.get("/leaderboard", userAuth, getGlobalLeaderboard);
 
 router.route("/register").post(
     upload.single("avatar"),

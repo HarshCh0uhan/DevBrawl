@@ -159,6 +159,12 @@ export default function Dashboard() {
             <span className="text-blue-400 font-semibold">{user?.username}</span>
           </div>
           <button
+            onClick={() => navigate('/leaderboard')}
+            className="rounded border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-amber-900 hover:text-amber-400 hover:border-amber-900 cursor-pointer"
+          >
+            🏆 HALL OF FAME
+          </button>
+          <button
             onClick={handleLogout}
             className="rounded border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-red-950 hover:text-red-400 hover:border-red-900 cursor-pointer"
           >
